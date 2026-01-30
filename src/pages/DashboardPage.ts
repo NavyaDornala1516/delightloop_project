@@ -12,6 +12,7 @@ export class DashboardPage{
     }
 
     async verifyDashboard(){
+        await this.page.waitForURL(/dashboard/);
         await expect(this.dashboardLink).toBeVisible();
     }
 
