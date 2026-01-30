@@ -6,7 +6,7 @@ export class ContactListPage {
 
     constructor(page: Page){
         this.page = page;
-        this.heading = page.getByRole('heading', {name: /contact lists/i})
+        this.heading = page.getByRole('heading', {name: 'Contact Lists'})
     }
 
     async verifyContactListPage(){

@@ -8,8 +8,8 @@ test("Valid Login Test", async ({ page }) => {
   const dashboardPage = new DashboardPage(page);
 
   await loginPage.goto();
-  await loginPage.login("test@delightloop.com", "test@delightloop.com");
+  await loginPage.login(process.env.TEST_EMAIL!, process.env.TEST_PASSWORD!);
 
-  await expect(page.getByRole('link', { name: 'dashboard' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
   await dashboardPage.verifyDashboard();
 });
