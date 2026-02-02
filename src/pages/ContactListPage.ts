@@ -19,14 +19,13 @@ export class ContactListPage {
   readonly city: Locator;
   readonly zipCode: Locator;
   readonly notes: Locator;
-
   readonly allContactsTab: Locator;
   readonly searchInput: Locator;
-
   readonly createNewContBtn: Locator;
   readonly successText: Locator;
-
   readonly contactCountText: Locator;
+  readonly invalidEmailError: Locator;
+  readonly firstNameError: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -51,7 +50,7 @@ export class ContactListPage {
     this.addressLine2 = page.getByPlaceholder("Apartment, suite, unit, etc.");
     this.country = page.getByRole("combobox", { name: /country/i });
     this.state = page.getByRole("combobox", { name: /state/i });
-    this.city = page.getByRole("combobox", { name: /city/i });
+    this.city = page.getByPlaceholder("Enter city");
     this.zipCode = page.getByPlaceholder("Enter ZIP code");
     this.notes = page.getByPlaceholder(
       "Enter any additional notes about this contact",
@@ -59,14 +58,21 @@ export class ContactListPage {
 
     this.successText = page.getByText("Contact created successfully");
 
-      this.allContactsTab = page.getByRole('radio', {
-      name: 'All Contacts',
+    this.allContactsTab = page.getByRole("radio", {
+      name: "All Contacts",
     });
 
-    this.searchInput = page.getByPlaceholder('Search contacts...');
+    this.searchInput = page.getByPlaceholder("Search contacts...");
 
     this.contactCountText = page.getByText(/contacts$/i);
 
+    this.invalidEmailError = page.getByText(
+      /please enter a valid email address/i,
+    );
+
+    this.firstNameError = page.getByText(
+      /first name can only contain letters, spaces, hyphens, and apostrophes/i,
+    );
   }
 
   async verifyContactListPage() {
@@ -93,12 +99,51 @@ export class ContactListPage {
     await expect(this.createNewContactText).not.toBeVisible();
   }
 
+  async verifyingMandatoryFields(
+    firstName: string,
+    lastName: string,
+    email: string,
+  ) {
+    await this.firstName.fill(firstName);
+    await this.lastName.fill(lastName);
+    await this.email.fill(email);
+    await this.createNewContBtn.click();
+    await expect(this.successText).toBeVisible();
+  }
+
   async verifyingEmptyFields() {
     await this.firstName.fill("");
     await this.lastName.fill("");
     await this.email.fill("");
     await this.createNewContBtn.click();
     await expect(this.firstName).toBeFocused();
+  }
+
+  async verifyingFirstNameEmpty() {
+    await this.firstName.fill("");
+    await this.createNewContBtn.click();
+    await expect(this.firstName).toBeFocused();
+  }
+  async verifyingLastNameEmpty() {
+    await this.lastName.fill("");
+    await this.createNewContBtn.click();
+    await expect(this.firstName).toBeFocused();
+  }
+  async verifyingEmailEmpty() {
+    await this.email.fill("");
+    await this.createNewContBtn.click();
+    await expect(this.firstName).toBeFocused();
+  }
+
+  async submitInvalidEmail(email: string) {
+    await this.email.fill(email);
+    await this.createNewContBtn.click();
+    await expect(this.invalidEmailError).toBeVisible();
+  }
+
+  async creatingContactWithExistingEmailID(email: string) {
+    await this.email.fill(email);
+    await this.createNewContBtn.click();
   }
 
   async verifyingCreatingContact() {
@@ -111,10 +156,16 @@ export class ContactListPage {
 
   async createContactWithAllFields() {
     await this.firstName.fill("Navya");
-    await this.lastName.fill("Dornala");
-    await this.email.fill("navya.dornala@test.com");
+    await this.lastName.fill("ddd");
+    await this.email.fill("navyadornala@test.com");
 
-    await this.phone.fill("9876543210");
+    await this.phone.click();
+    await this.phone.press("Control+A");
+    await this.phone.press("Backspace");
+
+    await this.phone.type("9876543519", { delay: 100 });
+    await this.phone.press('Enter');
+
     await this.jobTitle.fill("QA");
     await this.company.fill("Test Company");
 
@@ -123,10 +174,11 @@ export class ContactListPage {
 
     await this.country.selectOption("IN");
     await expect(this.state).toBeEnabled();
-    await this.state.selectOption({ label: /Karnataka/i });
+    await expect(this.state.locator('option[value="KA"]')).toBeAttached();
+    await this.state.selectOption("KA");
 
-    await expect(this.city).toBeEnabled();
-    await this.city.selectOption({ label: /Bengaluru/i });
+    await this.city.click();
+    await this.city.pressSequentially("Bengaluru", { delay: 100 });
 
     await this.zipCode.fill("560001");
     await this.notes.fill("Created via automation using POM");
@@ -134,8 +186,7 @@ export class ContactListPage {
     await this.createNewContBtn.click();
   }
 
-
-   async switchToAllContacts() {
+  async switchToAllContacts() {
     await expect(this.allContactsTab).toBeVisible();
     await this.allContactsTab.click();
   }
@@ -147,21 +198,44 @@ export class ContactListPage {
 
   async verifyContactPresent(identifier: string) {
     await expect(this.page.getByText(identifier)).toBeVisible();
-  };
+  }
 
-
-    async getContactCount(): Promise<number> {
+  async getContactCount(): Promise<number> {
     const text = await this.contactCountText.innerText();
-    return Number(text.replace(/\D/g, ''));
+    return Number(text.replace(/\D/g, ""));
   }
 
   async verifyContactCountIncremented(previousCount: number) {
-    await expect.poll(async () => {
-      return await this.getContactCount();
-    }).toBe(previousCount + 1);
+    await expect
+      .poll(async () => {
+        return await this.getContactCount();
+      })
+      .toBe(previousCount + 1);
+  }
+  async verifyContactVisible(identifier: string) {
+    await expect(this.page.getByText(identifier)).toBeVisible();
   }
 
+  async submitInvalidPhone(phone: string) {
+    await this.phone.fill(phone);
+    await this.createNewContBtn.click();
+  }
 
+  async verifyInvalidPhoneHandled() {
+    await expect(this.invalidPhoneError).toBeVisible();
 
+    await expect(this.phoneInput).toBeFocused();
+  }
 
-};
+  async submitWithOnlySpaces() {
+    await this.firstName.fill("   ");
+    await this.lastName.fill("   ");
+    await this.email.fill(`spaces.${Date.now()}@example.com`);
+
+    await this.createNewContBtn.click();
+  }
+
+  async verifySpacesValidation() {
+    await expect(this.firstNameError).toBeVisible();
+  }
+}

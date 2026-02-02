@@ -1,27 +1,32 @@
-import {Page, Locator} from '@playwright/test';
+import { Page, Locator } from "@playwright/test";
 
-export class LoginPage{
-    readonly page: Page;
-    readonly email: Locator;
-    readonly password: Locator;
-    readonly loginButton: Locator;
+export class LoginPage {
+  readonly page: Page;
+  readonly email: Locator;
+  readonly password: Locator;
+  readonly loginButton: Locator;
 
-    constructor(page:Page){
-        this.page = page;
-        this.email = page.getByPlaceholder('Enter your email');
-        this.password = page.locator('input[name="password"]');
+  constructor(page: Page) {
+    this.page = page;
+    this.email = page.getByPlaceholder("Enter your email");
+    this.password = page.locator('input[name="password"]');
 
-        this.loginButton = page.getByRole('button', {name: 'Sign in'});
-    }
+    this.loginButton = page.getByRole("button", { name: "Sign in" });
+  }
 
-    async goto(){
-        await this.page.goto('https://dev-platform.makesamhappy.com/login?next=%2F');
-    }
+async goto() {
+  await this.page.goto('/login', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
 
-    async login(email: string, pass: string){
-        await this.email.fill(email);
-        await this.password.fill(pass);
-        await this.loginButton.click();
-    }
+  await this.email.waitFor({ state: 'visible' });
+}
 
+
+  async login(email: string, pass: string) {
+    await this.email.fill(email);
+    await this.password.fill(pass);
+    await this.loginButton.click();
+  }
 }
