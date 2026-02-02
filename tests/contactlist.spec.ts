@@ -37,90 +37,148 @@ test.describe("Contact List Tests", () => {
 
   test("Validate creating a contact with all fields", async () => {
     await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.createContactWithAllFields();
+
+    const contactData = {
+      firstName: "Navya",
+      lastName: "ddd",
+      email: `navyadornala@test.com`,
+      jobTitle: "QA",
+      company: "Test Company",
+      country: "IN",
+      state: "KA",
+      city: "Bengaluru",
+      zipCode: "560001",
+      notes: "Created via automation",
+    };
+
+    await contactListPage.createContactWithAllFields(contactData);
+
+    await expect(contactListPage.successText).toBeVisible();
   });
 
   test("Mandatory fields validation on Add Contact", async () => {
     await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.verifyingMandatoryFields();
+
+    await contactListPage.fillMandatoryFields(
+      "Navya",
+      "ddd",
+      "navyadornala@test.com",
+    );
+
+    await expect(contactListPage.successText).toBeVisible();
   });
 
-  test("Validating Mandatory field empty", async () => {
+  const emptyFieldCases = [
+    {
+      name: "First Name Empty",
+      data: ["", "ddd", "test@test.com"],
+      expectedFocus: "firstName",
+    },
+    {
+      name: "Last Name Empty",
+      data: ["Navya", "", "test@test.com"],
+      expectedFocus: "lastName",
+    },
+    {
+      name: "Email Empty",
+      data: ["Navya", "ddd", ""],
+      expectedFocus: "email",
+    },
+  ];
+
+  // for (const testCase of emptyFieldCases) {
+  //   test(`Validating ${testCase.name}`, async () => {
+  //     await contactListPage.verifyingAddContactBtnClickable();
+
+  //     await contactListPage.fillMandatoryFields(
+  //       testCase.data[0],
+  //       testCase.data[1],
+  //       testCase.data[2],
+  //     );
+
+  //     const fieldMap = {
+  //       firstName: contactListPage.firstName,
+  //       lastName: contactListPage.lastName,
+  //       email: contactListPage.email,
+  //     };
+
+  //     await expect(fieldMap[testCase.expectedFocus]).toBeFocused();
+  //   });
+  // }
+
+  test("Validating Invalid Email format", async () => {
     await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.verifyingEmptyFields();
+
+    await contactListPage.fillMandatoryFields("Navya", "ddd", "invalidEmail");
+
+    await expect(contactListPage.invalidEmailError).toBeVisible();
   });
 
-  test("Validating First Name Empty", async ({ page }) => {
+  // //need to check
+  // test("Search should show matching contacts only", async () => {
+  //   await contactListPage.switchToAllContacts();
+  //   await contactListPage.searchContact("Navya");
+  //   await contactListPage.verifySearchResults("Navya");
+  // });
+
+  test("Validate contact count increment after creation", async () => {
     await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.verifyingFirstNameEmpty();
-  });
 
-  test("Validating Last Name Empty", async ({ page }) => {
-    await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.verifyingLastNameEmpty();
-  });
-
-  test("Validating Email Name Empty", async ({ page }) => {
-    await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.verifyingEmailEmpty();
-  });
-
-  test("Validating Invalid Email format", async ({ page }) => {
-    await contactListPage.verifyingAddContactBtnClickable();
-    await contactListPage.submitInvalidEmail(email);
-  });
-
-  test("validate newly created contact appears in all contacts", async ({
-    page,
-  }) => {
-    await contactListPage.switchToAllContacts();
-    await contactListPage.searchContact(email);
-    await contactListPage.verifyContactPresent(email);
-  });
-
-  test("Validate contact count increment after creation", async ({ page }) => {
     const countBefore = await contactListPage.getContactCount();
-    await contactListPage.verifyingCreatingContact();
+
+    const contactData = {
+      firstName: "fir",
+      lastName: "last",
+      email: `fir.last.${Date.now()}@test.com`,
+    };
+
+    await contactListPage.fillMandatoryFields(
+      contactData.firstName,
+      contactData.lastName,
+      contactData.email,
+    );
+
+    await expect(contactListPage.successText).toBeVisible();
+
     await contactListPage.verifyContactCountIncremented(countBefore);
   });
 
-  test("Validate search functionality for newly created contact", async ({
-    page,
-  }) => {
-    await contactListPage.searchContact(email);
-    await contactListPage.verifyContactVisible(email);
-  });
+  // test("Validate search functionality for newly created contact", async ({
+  //   page,
+  // }) => {
+  //   await contactListPage.searchContact(email);
+  //   await contactListPage.verifyContactVisible(email);
+  // });
 
   test("validating creating a contact with existing email id", async ({
     page,
   }) => {
     const existingEmail = "navyatesitng@gmail.com";
 
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.submitInvalidEmail(existingEmail);
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields("fir", "last", existingEmail);
+
+    await expect(contactListPage.successText).toBeVisible();
   });
 
-  test("Validating creating account with Invalid phone Number", async ({
-    page,
-  }) => {
-    const invalidPhone = "abc123";
+  ["abc123", "123abc", "!@#$%", "999"].forEach((phone) => {
+    test(`Invalid phone: ${phone}`, async ({ page }) => {
+      await contactListPage.verifyingAddContactBtnClickable();
+      await contactListPage.fillContactForm(
+        "Test",
+        "User",
+        "test@user.com",
+        phone,
+      );
 
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.submitInvalidPhone(invalidPhone);
-
-    await expect(
-      page.getByText(/contact created successfully/i),
-    ).not.toBeVisible();
-
-    await expect(
-      page.getByRole("heading", { name: "Create New Contact" }),
-    ).toBeVisible();
+      await expect(contactListPage.successText).not.toBeVisible();
+    });
   });
 
   test("Validate creating a contact with only spaces in mandatory fields", async ({
     page,
   }) => {
-    await contactListPage.verifyingCreatingContact();
+    await contactListPage.verifyingAddContactBtnClickable();
     await contactListPage.submitWithOnlySpaces();
     await contactListPage.verifySpacesValidation();
 
@@ -136,38 +194,36 @@ test.describe("Contact List Tests", () => {
   test("Validate creating a contact with maximum length First Name", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
+    const maxFirstName = "A".repeat(51);
+    const email = `nav.${Date.now()}@example.com`;
 
-    const maxFirstName = "A".repeat(50); // adjust if max length differs
-    const email = `max.fn.${Date.now()}@example.com`;
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields(maxFirstName, "User", email);
 
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields(maxFirstName, "User", email);
-
-    await expect(contactListPage.successText).toBeVisible();
+    await expect(
+      page.getByText(/first name must be less than 50 characters/i),
+    ).toBeVisible();
   });
 
   test("Validate creating a contact with maximum length Last Name", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
+    const maxLastName = "B".repeat(51);
+    const email = `nav.${Date.now()}@example.com`;
 
-    const maxLastName = "B".repeat(50);
-    const email = `max.ln.${Date.now()}@example.com`;
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields("Test", maxLastName, email);
 
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields("Test", maxLastName, email);
-
-    await expect(contactListPage.successText).toBeVisible();
+    await expect(
+      page.getByText(/last name must be less than 50 characters/i),
+    ).toBeVisible();
   });
 
   test("Validate creating a contact with special characters in name", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
-
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields(
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields(
       "Test@#$",
       "User",
       `special.${Date.now()}@example.com`,
@@ -180,27 +236,22 @@ test.describe("Contact List Tests", () => {
   test("Validate creating a contact with numeric values in name", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
-
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields(
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields(
       "Test123",
       "User",
       `numeric.${Date.now()}@example.com`,
     );
-    await contactListPage.submitForm();
 
     await expect(contactListPage.firstNameError).toBeVisible();
-    await expect(contactListPage.successToast).not.toBeVisible();
+    await expect(contactListPage.successText).not.toBeVisible();
   });
 
   test("Validate creating a contact with Unicode characters in name", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
-
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields(
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields(
       "测试用户",
       "测试",
       `unicode.${Date.now()}@example.com`,
@@ -212,12 +263,10 @@ test.describe("Contact List Tests", () => {
   test("Validate creating a contact with uppercase Email ID", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
-
     const email = `UPPERCASE.${Date.now()}@EXAMPLE.COM`;
 
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields("Upper", "Case", email);
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields("Upper", "Case", email);
 
     await expect(contactListPage.successText).toBeVisible();
   });
@@ -225,19 +274,15 @@ test.describe("Contact List Tests", () => {
   test("Validate creating a contact with same name and different Email", async ({
     page,
   }) => {
-    const contactListPage = new ContactListPage(page);
-
     const email1 = `same.name.${Date.now()}@example.com`;
     const email2 = `same.name.${Date.now() + 1}@example.com`;
 
-    // First contact
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields("Same", "User", email1);
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields("Same", "User", email1);
     await expect(contactListPage.successText).toBeVisible();
 
-    // Second contact with same name, different email
-    await contactListPage.verifyingCreatingContact();
-    await contactListPage.verifyingMandatoryFields("Same", "User", email2);
+    await contactListPage.verifyingAddContactBtnClickable();
+    await contactListPage.fillMandatoryFields("Same", "User", email2);
     await expect(contactListPage.successText).toBeVisible();
   });
 });

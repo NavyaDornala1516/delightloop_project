@@ -64,7 +64,9 @@ export class ContactListPage {
 
     this.searchInput = page.getByPlaceholder("Search contacts...");
 
-    this.contactCountText = page.getByText(/contacts$/i);
+    this.contactCountText = this.page.locator("span.text-tertiary", {
+      hasText: /contacts/i,
+    });
 
     this.invalidEmailError = page.getByText(
       /please enter a valid email address/i,
@@ -99,7 +101,32 @@ export class ContactListPage {
     await expect(this.createNewContactText).not.toBeVisible();
   }
 
-  async verifyingMandatoryFields(
+  async fillMandatoryFields(
+    firstName?: string,
+    lastName?: string,
+    email?: string,
+  ) {
+    if (firstName !== undefined) {
+      await this.firstName.fill(firstName);
+    }
+
+    if (lastName !== undefined) {
+      await this.lastName.fill(lastName);
+    }
+
+    if (email !== undefined) {
+      await this.email.fill(email);
+    }
+
+    await this.createNewContBtn.click();
+  }
+
+  async creatingContactWithExistingEmailID(email: string) {
+    await this.email.fill(email);
+    await this.createNewContBtn.click();
+  }
+
+  async verifyingCreatingContact(
     firstName: string,
     lastName: string,
     email: string,
@@ -108,86 +135,116 @@ export class ContactListPage {
     await this.lastName.fill(lastName);
     await this.email.fill(email);
     await this.createNewContBtn.click();
-    await expect(this.successText).toBeVisible();
   }
+  // async createContactWithAllFields() {
+  //   await this.firstName.fill("Navya");
+  //   await this.lastName.fill("ddd");
+  //   await this.email.fill("navyadornala@test.com");
 
-  async verifyingEmptyFields() {
-    await this.firstName.fill("");
-    await this.lastName.fill("");
-    await this.email.fill("");
-    await this.createNewContBtn.click();
-    await expect(this.firstName).toBeFocused();
-  }
+  //   // await this.phone.click();
+  //   // await this.phone.press("Control+A");
+  //   // await this.phone.press("Backspace");
 
-  async verifyingFirstNameEmpty() {
-    await this.firstName.fill("");
-    await this.createNewContBtn.click();
-    await expect(this.firstName).toBeFocused();
-  }
-  async verifyingLastNameEmpty() {
-    await this.lastName.fill("");
-    await this.createNewContBtn.click();
-    await expect(this.firstName).toBeFocused();
-  }
-  async verifyingEmailEmpty() {
-    await this.email.fill("");
-    await this.createNewContBtn.click();
-    await expect(this.firstName).toBeFocused();
-  }
+  //   // await this.phone.click();
 
-  async submitInvalidEmail(email: string) {
-    await this.email.fill(email);
-    await this.createNewContBtn.click();
-    await expect(this.invalidEmailError).toBeVisible();
-  }
+  //   // await this.phone.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  //   // await this.phone.press("Backspace");
+  //   // await this.phone.type("987654321", { delay: 100 });
+  //   // await this.phone.type("0", { delay: 150 });
+  //   // await this.phone.press("Enter");
 
-  async creatingContactWithExistingEmailID(email: string) {
-    await this.email.fill(email);
-    await this.createNewContBtn.click();
-  }
+  //   await this.jobTitle.fill("QA");
+  //   await this.company.fill("Test Company");
 
-  async verifyingCreatingContact() {
-    await this.firstName.fill("fir");
-    await this.lastName.fill("last");
-    await this.email.fill("firlast@gmail.com");
-    await this.createNewContBtn.click();
-    await expect(this.successText).toBeVisible();
-  }
+  //   await this.addressLine1.fill("MG Road");
+  //   await this.addressLine2.fill("Apartment 101");
 
-  async createContactWithAllFields() {
-    await this.firstName.fill("Navya");
-    await this.lastName.fill("ddd");
-    await this.email.fill("navyadornala@test.com");
+  //   await this.country.selectOption("IN");
+  //   await expect(this.state).toBeEnabled();
+  //   await expect(this.state.locator('option[value="KA"]')).toBeAttached();
+  //   await this.state.selectOption("KA");
 
-    await this.phone.click();
-    await this.phone.press("Control+A");
-    await this.phone.press("Backspace");
+  //   await this.city.click();
+  //   await this.city.pressSequentially("Bengaluru", { delay: 100 });
 
-    await this.phone.type("9876543519", { delay: 100 });
-    await this.phone.press('Enter');
+  //   await this.zipCode.fill("560001");
+  //   await this.notes.fill("Created via automation using POM");
 
-    await this.jobTitle.fill("QA");
-    await this.company.fill("Test Company");
+  //   await this.createNewContBtn.click();
+  //   await expect(this.createNewContactText).toBeVisible();
+  // }
+
+  //   async fillValidatedPhone(phoneNumber: string) {
+  //   await this.phone.click();
+
+  //   await this.phone.press(
+  //     process.platform === "darwin" ? "Meta+A" : "Control+A"
+  //   );
+  //   await this.phone.press("Backspace");
+
+  //   // force real value change
+  //   await this.phone.type(phoneNumber.slice(0, -1), { delay: 100 });
+  //   await this.phone.type(phoneNumber.slice(-1), { delay: 150 });
+
+  //   await this.phone.press("Enter");
+  // }
+
+  async createContactWithAllFields(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    jobTitle: string;
+    company: string;
+    country: string;
+    state: string;
+    city: string;
+    zipCode: string;
+    notes: string;
+  }) {
+    await this.firstName.fill(data.firstName);
+    await this.lastName.fill(data.lastName);
+    await this.email.fill(data.email);
+
+    await this.jobTitle.fill(data.jobTitle);
+    await this.company.fill(data.company);
 
     await this.addressLine1.fill("MG Road");
     await this.addressLine2.fill("Apartment 101");
 
-    await this.country.selectOption("IN");
-    await expect(this.state).toBeEnabled();
-    await expect(this.state.locator('option[value="KA"]')).toBeAttached();
-    await this.state.selectOption("KA");
+    await this.country.selectOption(data.country);
+
+    await expect(
+      this.state.locator(`option[value="${data.state}"]`),
+    ).toBeAttached();
+    await this.state.selectOption(data.state);
 
     await this.city.click();
-    await this.city.pressSequentially("Bengaluru", { delay: 100 });
+    await this.city.pressSequentially(data.city, { delay: 100 });
 
-    await this.zipCode.fill("560001");
-    await this.notes.fill("Created via automation using POM");
+    await this.zipCode.fill(data.zipCode);
+    await this.notes.fill(data.notes);
 
     await this.createNewContBtn.click();
   }
 
+  async fillContactForm(
+    firstName: string,
+    lastName: string,
+    email: string,
+    phone?: string,
+  ) {
+    await this.firstName.fill(firstName);
+    await this.lastName.fill(lastName);
+    await this.email.fill(email);
+
+    if (phone) {
+      await this.phone.fill(phone);
+    }
+
+    await this.createNewContBtn.click();
+  }
   async switchToAllContacts() {
-    await expect(this.allContactsTab).toBeVisible();
     await this.allContactsTab.click();
   }
 
@@ -196,22 +253,41 @@ export class ContactListPage {
     await this.searchInput.fill(value);
   }
 
-  async verifyContactPresent(identifier: string) {
-    await expect(this.page.getByText(identifier)).toBeVisible();
+  async verifySearchResultVisible(searchValue: string) {
+    const resultsCount = await this.contactNameButtons.count();
+    expect(resultsCount).toBeGreaterThan(0);
+
+    for (let i = 0; i < resultsCount; i++) {
+      await expect(this.contactNameButtons.nth(i)).toContainText(
+        new RegExp(searchValue, "i"),
+      );
+    }
+  }
+
+  async verifySearchResults(searchValue: string) {
+    const count = await this.contactCountText.count();
+    expect(count).toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      await expect(this.contactCountText.nth(i)).toContainText(
+        new RegExp(searchValue, "i"),
+      );
+    }
   }
 
   async getContactCount(): Promise<number> {
+    await expect(this.contactCountText).toBeVisible({ timeout: 15000 });
+
     const text = await this.contactCountText.innerText();
-    return Number(text.replace(/\D/g, ""));
+    return Number(text.match(/\d+/)?.[0]);
   }
 
   async verifyContactCountIncremented(previousCount: number) {
     await expect
-      .poll(async () => {
-        return await this.getContactCount();
-      })
+      .poll(async () => await this.getContactCount())
       .toBe(previousCount + 1);
   }
+
   async verifyContactVisible(identifier: string) {
     await expect(this.page.getByText(identifier)).toBeVisible();
   }
@@ -230,7 +306,7 @@ export class ContactListPage {
   async submitWithOnlySpaces() {
     await this.firstName.fill("   ");
     await this.lastName.fill("   ");
-    await this.email.fill(`spaces.${Date.now()}@example.com`);
+    await this.email.fill("    ");
 
     await this.createNewContBtn.click();
   }
