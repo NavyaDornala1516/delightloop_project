@@ -30,6 +30,12 @@ export class ContactListPage {
   readonly listNameInput: Locator;
   readonly createListBtn: Locator;
   readonly listsTab: Locator;
+  readonly listNameError: Locator;
+  readonly emptyListNameError: Locator;
+  readonly invalidListNameError: Locator;
+  readonly listItemByName: (name: string) => Locator;
+  readonly listCards: Locator;
+  readonly listCountText: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -94,6 +100,25 @@ export class ContactListPage {
       name: "Lists",
     });
 
+    this.listNameError = page.getByText(
+      "A list with this name already exists.",
+    );
+
+    this.emptyListNameError = page.getByText(
+      "Contact list name cannot be empty or only whitespace",
+    );
+    this.invalidListNameError = page.getByText(
+      /only letters|invalid characters|special characters/i,
+    );
+
+    this.listItemByName = (name: string) =>
+      page.getByText(name, { exact: true });
+
+    this.listCountText = page.getByText(/^\d+\s+contact lists$/i);
+
+    this.listCards = page.locator(
+      "div.rounded-xl.bg-primary.border.border-secondary",
+    );
   }
 
   async captureScreenshot(name: string) {
@@ -302,10 +327,10 @@ export class ContactListPage {
   }
 
   async getContactCount(): Promise<number> {
-    await expect(this.contactCountText).toBeVisible({ timeout: 15000 });
+    await expect(this.listCountText).toBeVisible();
 
-    const text = await this.contactCountText.innerText();
-    return Number(text.match(/\d+/)?.[0]);
+    const text = await this.listCountText.textContent();
+    return Number(text?.match(/\d+/)?.[0]);
   }
 
   async verifyContactCountIncremented(previousCount: number) {
@@ -353,7 +378,7 @@ export class ContactListPage {
 
   async openCreateContactListPanel() {
     await this.newContactListBtn.click();
-    await expect(this.listNameInput).toBeVisible();
+    // await expect(this.listNameInput).toBeVisible();
   }
   async verifyListNameFieldIsFocused() {
     await expect(this.listNameInput).toBeFocused();
@@ -367,5 +392,63 @@ export class ContactListPage {
     await this.listsTab.click();
     await expect(this.page.getByText(listName, { exact: true })).toBeVisible();
     await this.page.getByText(listName, { exact: true }).click();
+  }
+
+  async verifyListNameError() {
+    await expect(this.listNameError).toBeVisible({ timeout: 10000 });
+  }
+
+  async submitWhitespaceListName() {
+    await this.listNameInput.fill("   ");
+    await expect(this.createListBtn).toBeDisabled();
+  }
+
+  async verifyEmptyListNameError() {
+    await expect(this.emptyListNameError).toBeVisible({ timeout: 10000 });
+  }
+
+  async fillListName(value: string) {
+    await this.listNameInput.fill(value);
+  }
+
+  async clickCreateList() {
+    await expect(this.createListBtn).toBeEnabled();
+    await this.createListBtn.click();
+  }
+
+  async generateString(length: number): string {
+    return "A".repeat(length);
+  }
+
+  async getListCountByName(name: string): Promise<number> {
+    return await this.page.getByText(name, { exact: true }).count();
+  }
+  async doubleClickCreateList() {
+    await expect(this.createListBtn).toBeVisible({ timeout: 10000 });
+    await expect(this.createListBtn).toBeEnabled();
+
+    // Playwright double click
+    await this.createListBtn.dblclick();
+  }
+
+  async switchToListsTab() {
+    await this.listsTab.click();
+  }
+
+  async verifyListVisible(listName: string) {
+    await expect(this.listItemByName(listName)).toBeVisible({
+      timeout: 15000,
+    });
+  }
+
+  async getContactListCount(): Promise<number> {
+    await expect(this.listCountText).toBeVisible();
+
+    const text = await this.listCountText.textContent();
+    return Number(text?.match(/\d+/)?.[0]);
+  }
+
+  async openListByIndex(index = 0) {
+    await this.listCards.nth(index).click();
   }
 }

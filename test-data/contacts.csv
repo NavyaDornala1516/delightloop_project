@@ -1,5 +1,5 @@
-first name,last name,Company,Role,Source,Address,gmail,state,country,phonenumber
-navya,t1,abc,tester,adf,adfsdf,navyatesitng@gmail.com,telangana,india,1234567893
-krish,t2,xy,tester,adf,adfsdf,navyatesitng1@gmail.com,telangana,india,1234567893
-shiva,t3,xyz,tester,adf,adfsdf,navyatesitng2@gmail.com,telangana,india,1234567893
-veer,t4,dcba,tester,adf,adfsdf,navyatesitng3@gmail.com,telangana,india,1234567893
+first name,last name,gmail,Company,Role,Source,Address,,state,country,phonenumber
+navya,t1,navyatesitng@gmail.com,abc,tester,adf,adfsdf,,telangana,india,1234567893
+krish,t2,navyatesitng1@gmail.com,xy,tester,adf,adfsdf,,telangana,india,1234567893
+shiva,t3,navyatesitng2@gmail.com,xyz,tester,adf,adfsdf,,telangana,india,1234567893
+veer,t4,navyatesitng3@gmail.com,dcba,tester,adf,adfsdf,,telangana,india,1234567893

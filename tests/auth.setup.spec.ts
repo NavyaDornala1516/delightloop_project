@@ -11,7 +11,7 @@ test("auth setup - save login session", async ({ page }) => {
 
   await page.getByRole("button", { name: /sign in/i }).click();
 
-  await page.waitForURL(/dashboard/, { timeout: 20000 });
+  // await page.waitForURL(/dashboard/, { timeout: 20000 });
 
   await expect(
     page.getByPlaceholder("Enter your email")

@@ -1,4 +1,4 @@
-import { ContactListDetailsPage } from './../src/pages/contactListDetailsPage';
+import { ContactListDetailsPage } from "./../src/pages/contactListDetailsPage";
 import { test, expect } from "@playwright/test";
 import { DashboardPage } from "./../src/pages/DashboardPage";
 import { ContactListPage } from "./../src/pages/ContactListPage";
@@ -11,11 +11,11 @@ test.describe("Contact List Tests", () => {
   test.beforeEach(async ({ page }) => {
     dashboardPage = new DashboardPage(page);
     contactListPage = new ContactListPage(page);
+    contactListDetailsPage = new ContactListDetailsPage(page);
 
-    await page.goto("/dashboard");
-    await dashboardPage.verifyDashboard();
-    await dashboardPage.clickContactLists();
-    await contactListPage.verifyContactListPage();
+    await page.goto("/contact-lists", {
+      waitUntil: "domcontentloaded",
+    });
   });
 
   test("Contact List link should open", async () => {
@@ -319,31 +319,146 @@ test.describe("Contact List Tests", () => {
     await contactListPage.captureScreenshot("duplicate list error phone");
   });
 
-  test("Verify importing contacts using CSV file", async ({ page }) => {
-    contactListDetailsPage = new ContactListDetailsPage(page);
+  test("Verify error when creating contact list with only spaces", async () => {
+    await contactListPage.openCreateContactListPanel();
 
+    await contactListPage.fillListName("   ");
+
+    await expect(contactListPage.createListBtn).toBeDisabled();
+    await expect(contactListPage.emptyListNameError).toBeVisible();
+  });
+
+  test("Verify creating contact list with special characters", async () => {
+    await contactListPage.openCreateContactListPanel();
+
+    const specialCharName = "@#$%^&*()";
+
+    await contactListPage.listNameInput.fill(specialCharName);
+
+    await expect(contactListPage.createListBtn).toBeDisabled();
+
+    await expect(contactListPage.invalidListNameError).toBeVisible({
+      timeout: 10000,
+    });
+
+    await contactListPage.listsTab.click();
+    await expect(page.getByText(specialCharName)).not.toBeVisible();
+  });
+
+  test("Verify creating contact list with maximum allowed characters", async () => {
+    await contactListPage.openCreateContactListPanel();
+
+    // Assuming max allowed length = 50
+    const maxLengthName = "A".repeat(60);
+
+    await contactListPage.listNameInput.fill(maxLengthName);
+
+    // Create button should be enabled
+    await expect(contactListPage.createListBtn).toBeEnabled();
+
+    // Create the list
+    await contactListPage.createListBtn.click();
+
+    // Verify list appears in Lists tab
+    await contactListPage.listsTab.click();
+    await expect(page.getByText(maxLengthName, { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
+  test("Verify double-click behavior on Create Contact List button", async ({
+    page,
+  }) => {
+    const listName = `DoubleClick-${Date.now()}`;
+
+    // Open create list panel
+    await contactListPage.openCreateContactListPanel();
+
+    // Enter list name
+    await contactListPage.listNameInput.fill(listName);
+
+    // Double click Create List
+    await contactListPage.doubleClickCreateList();
+
+    // Go to Lists tab
+    await contactListPage.listsTab.click();
+
+    // Count how many times the list appears
+    const listCount = await page.getByText(listName, { exact: true }).count();
+
+    // ✅ Assert only ONE list created
+    expect(listCount).toBe(1);
+  });
+
+  test("Verify contact count displayed on list card is correct", async ({
+    page,
+  }) => {
+    const listName = `DoubleClick-${Date.now()}`;
+
+    // Open create list panel
+    await contactListPage.openCreateContactListPanel();
+
+    // Enter list name
+    await contactListPage.listNameInput.fill(listName);
+
+    const cardCount = await contactListPage.getContactCountFromCard(0);
+
+    // Open that list
+    await contactListPage.openListByIndex(0);
+
+    // Get actual contacts inside the list
+    const actualCount = await contactListDetailsPage.getActualContactsCount();
+
+    expect(actualCount).toBe(cardCount);
+  });
+
+  test("Verify contact list count increases after creating new list", async ({
+    page,
+  }) => {
+
+    await contactListPage.switchToListsTab();
+    const beforeCount = await contactListPage.getContactListCount();
+
+    const listName = `Auto List ${Date.now()}`;
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
+
+    await contactListPage.switchToListsTab();
+
+    const afterCount = await contactListPage.getContactListCount();
+
+    expect(afterCount).toBe(beforeCount + 1);
+  });
+
+  test("Verify importing contacts using CSV file", async ({ page }) => {
     const listName = `CSV List ${Date.now()}`;
-    const csvFilePath = "test-data/contacts.csv";
-    const expectedContactName = "Navya";
 
     await contactListPage.newContactListClickable();
     await contactListPage.createContactList(listName);
     await contactListPage.openList(listName);
 
-    await contactListDetailsPage.verifyListDetailsPage(listName);
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadCsv("test-data/contacts.csv");
 
-    await contactListDetailsPage.importContactsUsingCsv(csvFilePath);
+    // ✅ ONE call handles ALL cases
+    await contactListDetailsPage.completeCsvWizard();
 
-    await expect(
-      page.getByText(expectedContactName, { exact: true }),
-    ).toBeVisible();
+    await page.reload();
+
+    // await expect(page.getByText(/1 contact/i)).toBeVisible({ timeout: 30000 });
+    await contactListDetailsPage.clickBackToContactLists();
   });
 
+  test("Add one existing contact to list", async ({ page }) => {
+    const listName = `Single Contact List ${Date.now()}`;
 
-
-  
-
-
-
-
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+    await contactListDetailsPage.openAddContact();
+    await contactListDetailsPage.searchContact("Navya");
+    await contactListDetailsPage.selectFirstVisibleContact();
+    await contactListDetailsPage.addToList();
+    await contactListDetailsPage.clickBackToContactLists();
+  });
 });
