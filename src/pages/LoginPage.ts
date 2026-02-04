@@ -15,7 +15,7 @@ export class LoginPage {
   }
 
 async goto() {
-  await this.page.goto('/login', {
+  await this.page.goto('/dashboard', {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   });

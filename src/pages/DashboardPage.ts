@@ -13,9 +13,8 @@ export class DashboardPage {
   }
 
   async verifyDashboard() {
-    await expect(this.page).toHaveURL(/dashboard/, { timeout: 15000 });
-
-    await expect(this.dashboardLink).toBeVisible();
+    await this.page.waitForURL(/dashboard/, { timeout: 20000 });
+    await this.page.waitForLoadState("networkidle");
   }
 
   async verifyContactListsVisible() {

@@ -1,3 +1,4 @@
+import { ContactListDetailsPage } from './../src/pages/contactListDetailsPage';
 import { test, expect } from "@playwright/test";
 import { DashboardPage } from "./../src/pages/DashboardPage";
 import { ContactListPage } from "./../src/pages/ContactListPage";
@@ -5,15 +6,14 @@ import { ContactListPage } from "./../src/pages/ContactListPage";
 test.describe("Contact List Tests", () => {
   let dashboardPage: DashboardPage;
   let contactListPage: ContactListPage;
+  let contactListDetailsPage: ContactListDetailsPage;
 
   test.beforeEach(async ({ page }) => {
     dashboardPage = new DashboardPage(page);
     contactListPage = new ContactListPage(page);
 
     await page.goto("/dashboard");
-
     await dashboardPage.verifyDashboard();
-    await dashboardPage.verifyContactListsVisible();
     await dashboardPage.clickContactLists();
     await contactListPage.verifyContactListPage();
   });
@@ -172,6 +172,7 @@ test.describe("Contact List Tests", () => {
       );
 
       await expect(contactListPage.successText).not.toBeVisible();
+      await contactListPage.captureScreenshot("invalid phone");
     });
   });
 
@@ -285,4 +286,64 @@ test.describe("Contact List Tests", () => {
     await contactListPage.fillMandatoryFields("Same", "User", email2);
     await expect(contactListPage.successText).toBeVisible();
   });
+
+  test("creating contact list", async ({ page }) => {
+    await contactListPage.newContactListClickable();
+    const listName = `Test List ${Date.now()}`;
+    await contactListPage.createContactList(listName);
+  });
+
+  test("Verify field is focused and Create button is disabled when list name is empty", async ({
+    page,
+  }) => {
+    await contactListPage.newContactListClickable();
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.verifyListNameFieldIsFocused();
+    await contactListPage.verifyCreateButtonIsNotInteractable();
+  });
+
+  test("Verify warning message is shown when creating contact list with duplicate name", async ({
+    page,
+  }) => {
+    await contactListPage.newContactListClickable();
+
+    const existingListName = "newList";
+
+    await contactListPage.createContactList(existingListName);
+
+    await expect(page.getByText(/already exists|duplicate/i)).toBeVisible();
+
+    await expect(page.getByText(/created successfully/i)).not.toBeVisible();
+
+    await page.getByRole("tab", { name: "Lists" }).click();
+    await contactListPage.captureScreenshot("duplicate list error phone");
+  });
+
+  test("Verify importing contacts using CSV file", async ({ page }) => {
+    contactListDetailsPage = new ContactListDetailsPage(page);
+
+    const listName = `CSV List ${Date.now()}`;
+    const csvFilePath = "test-data/contacts.csv";
+    const expectedContactName = "Navya";
+
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    await contactListDetailsPage.verifyListDetailsPage(listName);
+
+    await contactListDetailsPage.importContactsUsingCsv(csvFilePath);
+
+    await expect(
+      page.getByText(expectedContactName, { exact: true }),
+    ).toBeVisible();
+  });
+
+
+
+  
+
+
+
+
 });

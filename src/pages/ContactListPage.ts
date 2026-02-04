@@ -26,6 +26,10 @@ export class ContactListPage {
   readonly contactCountText: Locator;
   readonly invalidEmailError: Locator;
   readonly firstNameError: Locator;
+  readonly newContactListBtn: Locator;
+  readonly listNameInput: Locator;
+  readonly createListBtn: Locator;
+  readonly listsTab: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -75,6 +79,28 @@ export class ContactListPage {
     this.firstNameError = page.getByText(
       /first name can only contain letters, spaces, hyphens, and apostrophes/i,
     );
+
+    this.newContactListBtn = page.getByRole("button", {
+      name: "New Contact List",
+    });
+
+    this.listNameInput = page.getByLabel("Enter list name");
+
+    this.createListBtn = page.getByRole("button", {
+      name: "Create List",
+    });
+
+    this.listsTab = page.getByRole("radio", {
+      name: "Lists",
+    });
+
+  }
+
+  async captureScreenshot(name: string) {
+    await this.page.screenshot({
+      path: `screenshots/${name}.png`,
+      fullPage: false,
+    });
   }
 
   async verifyContactListPage() {
@@ -313,5 +339,33 @@ export class ContactListPage {
 
   async verifySpacesValidation() {
     await expect(this.firstNameError).toBeVisible();
+  }
+
+  async newContactListClickable() {
+    await this.newContactListBtn.click();
+  }
+
+  async createContactList(listName: string) {
+    await this.listNameInput.fill(listName);
+    await expect(this.createListBtn).toBeEnabled();
+    await this.createListBtn.click();
+  }
+
+  async openCreateContactListPanel() {
+    await this.newContactListBtn.click();
+    await expect(this.listNameInput).toBeVisible();
+  }
+  async verifyListNameFieldIsFocused() {
+    await expect(this.listNameInput).toBeFocused();
+  }
+
+  async verifyCreateButtonIsNotInteractable() {
+    await expect(this.createListBtn).toBeDisabled();
+  }
+
+  async openList(listName: string) {
+    await this.listsTab.click();
+    await expect(this.page.getByText(listName, { exact: true })).toBeVisible();
+    await this.page.getByText(listName, { exact: true }).click();
   }
 }
