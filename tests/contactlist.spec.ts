@@ -227,7 +227,7 @@ test.describe("Contact List Tests", () => {
     await contactListPage.fillMandatoryFields(
       "Test@#$",
       "User",
-      `special.${Date.now()}@example.com`,
+      `Navya.${Date.now()}@example.com`,
     );
 
     await expect(contactListPage.firstNameError).toBeVisible();
@@ -241,7 +241,7 @@ test.describe("Contact List Tests", () => {
     await contactListPage.fillMandatoryFields(
       "Test123",
       "User",
-      `numeric.${Date.now()}@example.com`,
+      `Navya.${Date.now()}@example.com`,
     );
 
     await expect(contactListPage.firstNameError).toBeVisible();
@@ -255,7 +255,7 @@ test.describe("Contact List Tests", () => {
     await contactListPage.fillMandatoryFields(
       "测试用户",
       "测试",
-      `unicode.${Date.now()}@example.com`,
+      `Navya.${Date.now()}@example.com`,
     );
 
     await expect(contactListPage.firstNameError).toBeVisible();
@@ -264,7 +264,7 @@ test.describe("Contact List Tests", () => {
   test("Validate creating a contact with uppercase Email ID", async ({
     page,
   }) => {
-    const email = `UPPERCASE.${Date.now()}@EXAMPLE.COM`;
+    const email = `Navya.${Date.now()}@EXAMPLE.COM`;
 
     await contactListPage.verifyingAddContactBtnClickable();
     await contactListPage.fillMandatoryFields("Upper", "Case", email);
@@ -289,7 +289,7 @@ test.describe("Contact List Tests", () => {
 
   test("creating contact list", async ({ page }) => {
     await contactListPage.newContactListClickable();
-    const listName = `Test List ${Date.now()}`;
+    const listName = `Navya ${Date.now()}`;
     await contactListPage.createContactList(listName);
   });
 
@@ -369,7 +369,7 @@ test.describe("Contact List Tests", () => {
   test("Verify double-click behavior on Create Contact List button", async ({
     page,
   }) => {
-    const listName = `DoubleClick-${Date.now()}`;
+    const listName = `Navya-${Date.now()}`;
 
     // Open create list panel
     await contactListPage.openCreateContactListPanel();
@@ -386,40 +386,83 @@ test.describe("Contact List Tests", () => {
     // Count how many times the list appears
     const listCount = await page.getByText(listName, { exact: true }).count();
 
-    // ✅ Assert only ONE list created
     expect(listCount).toBe(1);
   });
 
   test("Verify contact count displayed on list card is correct", async ({
     page,
   }) => {
-    const listName = `DoubleClick-${Date.now()}`;
+    const listName = `Navya-${Date.now()}`;
 
-    // Open create list panel
     await contactListPage.openCreateContactListPanel();
 
-    // Enter list name
     await contactListPage.listNameInput.fill(listName);
 
     const cardCount = await contactListPage.getContactCountFromCard(0);
 
-    // Open that list
     await contactListPage.openListByIndex(0);
 
-    // Get actual contacts inside the list
     const actualCount = await contactListDetailsPage.getActualContactsCount();
 
     expect(actualCount).toBe(cardCount);
   });
 
+  test("Verify importing contacts using invalid CSV file", async ({ page }) => {
+    const listName = `Navya ${Date.now()}`;
+
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadInvalidFile(
+      "test-data/invalid-file.txt",
+    );
+
+    await contactListDetailsPage.verifyInvalidFileUploadError();
+  });
+
+  test("Verify importing contacts using no Mandatory fields CSV file", async ({
+    page,
+  }) => {
+    const listName = `Navya ${Date.now()}`;
+
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadInvalidFile("test-data/nofields.csv");
+    await contactListDetailsPage.verifyInvalidFileUploadError();
+  });
+
+  test("Verify importing contacts using no Dublicate Contacts fields CSV file", async ({
+    page,
+  }) => {
+    const listName = `Navya ${Date.now()}`;
+
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadInvalidFile(
+      "test-data/dublicateContacts.csv",
+    );
+
+    await contactListDetailsPage.completeCsvWizard();
+
+    await page.reload();
+
+    await contactListDetailsPage.clickBackToContactLists();
+  });
   test("Verify contact list count increases after creating new list", async ({
     page,
   }) => {
-
     await contactListPage.switchToListsTab();
     const beforeCount = await contactListPage.getContactListCount();
 
-    const listName = `Auto List ${Date.now()}`;
+    const listName = `Navya ${Date.now()}`;
     await contactListPage.openCreateContactListPanel();
     await contactListPage.createContactList(listName);
 
@@ -429,28 +472,117 @@ test.describe("Contact List Tests", () => {
 
     expect(afterCount).toBe(beforeCount + 1);
   });
-
-  test("Verify importing contacts using CSV file", async ({ page }) => {
-    const listName = `CSV List ${Date.now()}`;
+  test("Add multiple existing contacts to list", async ({ page }) => {
+    const listName = `Navya ${Date.now()}`;
 
     await contactListPage.newContactListClickable();
     await contactListPage.createContactList(listName);
     await contactListPage.openList(listName);
 
+    await contactListDetailsPage.openAddContact();
+    await contactListDetailsPage.searchContact("Navya");
+
+    await contactListDetailsPage.selectMultipleContacts(3);
+
+    await contactListDetailsPage.addToList();
+    await contactListDetailsPage.clickBackToContactLists();
+  });
+
+  test("Verify Add to List button is disabled without contact selection", async () => {
+    const listName = `Navya ${Date.now()}`;
+
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    await contactListDetailsPage.openAddContact();
+    await contactListDetailsPage.searchContact("Navya");
+
+    await contactListDetailsPage.verifyAddToListButtonIsNotVisible();
+  });
+test("Verify Rename List updates name everywhere", async () => {
+  const originalName = `Navya Test ${Date.now()}`;
+  const newName = `Renamed ${Date.now()}`;
+
+  await contactListPage.newContactListClickable();
+  await contactListPage.createContactList(originalName);
+
+  await contactListPage.renameList(originalName, newName);
+
+  await expect(contactListPage.listCard(newName)).toBeVisible();
+});
+ 
+
+test("Verify Rename List does not allow duplicate names", async () => {
+  const listA = `Navya Rename-A-${Date.now()}`;
+  const listB = `Navya Rename-B-${Date.now()}`;
+
+  await contactListPage.newContactListClickable();
+  await contactListPage.createContactList(listA);
+
+  await contactListPage.newContactListClickable();
+  await contactListPage.createContactList(listB);
+
+  await contactListPage.switchToListsTab();
+  await contactListPage.waitForListsLoaded();
+
+  await contactListPage.renameList(listA, listB);
+
+  await contactListPage.verifyDuplicateRenameError();
+});
+
+test("Verify Duplicate List creates new list successfully", async () => {
+  const listName = `Multi Contact List ${Date.now()}`;
+
+  await contactListPage.newContactListClickable();
+  await contactListPage.createContactList(listName);
+
+  await contactListPage.duplicateList(listName);
+
+  await contactListPage.verifyDuplicateListCreated(listName);
+});
+
+test("Verify duplicated list contains all contacts", async ({ page }) => {
+  const listName = "Multi Contact List 1770258021515";
+
+  const originalCard = contactListPage.listCardByName(listName);
+  const originalCount = await originalCard
+    .getByText(/contacts/i)
+    .textContent();
+
+  await contactListPage.duplicateList(listName);
+
+  const duplicatedCard = page.locator("div.rounded-xl").nth(1);
+  await expect(
+    duplicatedCard.getByText(originalCount!)
+  ).toBeVisible();
+});
+
+test("Verify Mark as Inactive changes list status correctly", async () => {
+  const listName = `Navya ${Date.now()}`;
+
+  await contactListPage.newContactListClickable();
+  await contactListPage.createContactList(listName);
+
+  await contactListPage.markListInactive(listName);
+  await contactListPage.verifyListIsInactive(listName);
+});
+
+  test("Verify importing contacts using CSV file", async ({ page }) => {
+    const listName = `Navya ${Date.now()}`;
+
+    await contactListPage.newContactListClickable();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
     await contactListDetailsPage.openImportCsvModal();
     await contactListDetailsPage.uploadCsv("test-data/contacts.csv");
-
-    // ✅ ONE call handles ALL cases
     await contactListDetailsPage.completeCsvWizard();
-
     await page.reload();
-
-    // await expect(page.getByText(/1 contact/i)).toBeVisible({ timeout: 30000 });
     await contactListDetailsPage.clickBackToContactLists();
   });
 
   test("Add one existing contact to list", async ({ page }) => {
-    const listName = `Single Contact List ${Date.now()}`;
+    const listName = `Navya ${Date.now()}`;
 
     await contactListPage.newContactListClickable();
     await contactListPage.createContactList(listName);

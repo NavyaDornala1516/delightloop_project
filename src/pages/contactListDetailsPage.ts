@@ -14,8 +14,11 @@ export class ContactListDetailsPage {
   readonly searchInput: Locator;
   readonly contactResults: Locator;
   readonly backToContactListBtn: Locator;
-    readonly contactRows: Locator;
+  readonly contactRows: Locator;
 
+  readonly uploadErrorTitle: Locator;
+  readonly uploadErrorMessage: Locator;
+  readonly contactCheckboxes: Locator;
   constructor(page: Page) {
     this.page = page;
 
@@ -53,12 +56,20 @@ export class ContactListDetailsPage {
       name: /Add \d+ to List/i,
     });
 
-  this.backToContactListBtn = page.getByRole("button", {
-    name: "Back to Contact Lists",
-  });
-      this.contactRows = page.locator(
-      '[role="button"][aria-disabled="false"]'
+    this.uploadErrorTitle = page.getByText("Upload Error");
+    this.uploadErrorMessage = page.getByText(
+      "Invalid file type. Only CSV files are allowed.",
     );
+
+    this.backToContactListBtn = page.getByRole("button", {
+      name: "Back to Contact Lists",
+    });
+    this.contactCheckboxes = this.page.getByRole("checkbox");
+    this.contactRows = page.locator('[role="button"][aria-disabled="false"]');
+
+
+
+
   }
 
   async openImportCsvModal() {
@@ -70,11 +81,10 @@ export class ContactListDetailsPage {
     const filePath = path.resolve(process.cwd(), fileName);
     await this.fileInput.setInputFiles(filePath);
 
-    // ✅ WAIT for CSV parsing to finish
     await expect(this.nextStepBtn).toBeEnabled({ timeout: 30000 });
   }
+
   async completeCsvWizard() {
-    // Wait until either Next step OR Import Contacts appears
     await Promise.race([
       this.nextStepBtn
         .waitFor({ state: "visible", timeout: 30000 })
@@ -82,13 +92,11 @@ export class ContactListDetailsPage {
       this.importContactBtn.waitFor({ state: "visible", timeout: 30000 }),
     ]);
 
-    // If Next step exists → click through steps
     while (await this.nextStepBtn.isVisible()) {
       await expect(this.nextStepBtn).toBeEnabled();
       await this.nextStepBtn.click();
     }
 
-    // Final import
     await expect(this.importContactBtn).toBeEnabled({ timeout: 30000 });
     await this.importContactBtn.click();
   }
@@ -107,73 +115,69 @@ export class ContactListDetailsPage {
     await expect(this.searchInput).toBeVisible({ timeout: 20000 });
   }
 
-async searchContact(text: string) {
-  await expect(this.searchInput).toBeVisible({ timeout: 15000 });
-  await this.searchInput.fill(text);
+  async searchContact(text: string) {
+    await expect(this.searchInput).toBeVisible({ timeout: 15000 });
+    await this.searchInput.fill(text);
 
-  // Let results update
-  await this.page.waitForLoadState("networkidle");
-}
-
-async selectFirstVisibleContact() {
-  // 1️⃣ Wait for search results container to appear
-  const resultsContainer = this.page.locator("div.space-y-3");
-  await expect(resultsContainer).toBeVisible({ timeout: 20000 });
-
-  // 2️⃣ Wait until at least ONE checkbox exists
-  const checkboxes = resultsContainer.locator('input[type="checkbox"]');
-
-  await expect
-    .poll(async () => await checkboxes.count(), {
-      timeout: 20000,
-    })
-    .toBeGreaterThan(0);
-
-  // 3️⃣ Click the FIRST checkbox safely
-  await checkboxes.first().scrollIntoViewIfNeeded();
-  await checkboxes.first().check({ force: true });
-
-  // 4️⃣ Wait for Add to List button to enable
-  await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
-}
-
-async addSelectedContactToList() {
-  await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
-  await this.addToListBtn.click();
-}
-
-
-async selectContactByFullName(fullName: string) {
-  const checkbox = this.page.getByRole("checkbox", {
-    name: `Select ${fullName}`,
-    exact: true,
-  });
-
-  await expect(checkbox).toBeVisible({ timeout: 20000 });
-  await checkbox.check();
-
-  await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
-}
-async selectAllVisibleContacts() {
-  // All contact cards are role="button" inside the search results area
-  const contactCards = this.page.locator(
-    'div[role="button"][aria-disabled="false"]'
-  );
-
-  // Wait until at least one result appears
-  await expect(contactCards.first()).toBeVisible({ timeout: 20000 });
-
-  const count = await contactCards.count();
-  console.log(`Found ${count} contacts`);
-
-  for (let i = 0; i < count; i++) {
-    await contactCards.nth(i).scrollIntoViewIfNeeded();
-    await contactCards.nth(i).click();
+    // Let results update
+    await this.page.waitForLoadState("networkidle");
   }
 
-  // After selecting, Add to List button must be enabled
-  await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
-}
+  async selectFirstVisibleContact() {
+    // 1️⃣ Wait for search results container to appear
+    const resultsContainer = this.page.locator("div.space-y-3");
+    await expect(resultsContainer).toBeVisible({ timeout: 20000 });
+
+    // 2️⃣ Wait until at least ONE checkbox exists
+    const checkboxes = resultsContainer.locator('input[type="checkbox"]');
+
+    await expect
+      .poll(async () => await checkboxes.count(), {
+        timeout: 20000,
+      })
+      .toBeGreaterThan(0);
+
+    // 3️⃣ Click the FIRST checkbox safely
+    await checkboxes.first().scrollIntoViewIfNeeded();
+    await checkboxes.first().check({ force: true });
+
+    // 4️⃣ Wait for Add to List button to enable
+    await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
+  }
+
+  async addSelectedContactToList() {
+    await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
+    await this.addToListBtn.click();
+  }
+
+  async selectContactByFullName(fullName: string) {
+    const checkbox = this.page.getByRole("checkbox", {
+      name: `Select ${fullName}`,
+      exact: true,
+    });
+
+    await expect(checkbox).toBeVisible({ timeout: 20000 });
+    await checkbox.check();
+
+    await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
+  }
+  async selectAllVisibleContacts() {
+    const contactCards = this.page.locator(
+      'div[role="button"][aria-disabled="false"]',
+    );
+
+    await expect(contactCards.first()).toBeVisible({ timeout: 20000 });
+
+    const count = await contactCards.count();
+    console.log(`Found ${count} contacts`);
+
+    for (let i = 0; i < count; i++) {
+      await contactCards.nth(i).scrollIntoViewIfNeeded();
+      await contactCards.nth(i).click();
+    }
+
+    await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
+  }
 
   async addToList() {
     await this.addToListBtn.click();
@@ -190,17 +194,45 @@ async selectAllVisibleContacts() {
       .toBeGreaterThan(previousCount);
   }
 
-
   async clickBackToContactLists() {
-  await expect(this.backToContactListBtn).toBeVisible({ timeout: 15000 });
-  await expect(this.backToContactListBtn).toBeEnabled();
-  await this.backToContactListBtn.click();
-}
+    await expect(this.backToContactListBtn).toBeVisible({ timeout: 15000 });
+    await expect(this.backToContactListBtn).toBeEnabled();
+    await this.backToContactListBtn.click();
+  }
 
   async getActualContactsCount(): Promise<number> {
-    // If no contacts → list may show empty state
     const count = await this.contactRows.count();
     return count;
   }
 
+  async uploadInvalidFile(filePath: string) {
+    await this.fileInput.setInputFiles(filePath);
+  }
+
+  async verifyInvalidFileUploadError() {
+    await expect(this.page.getByText("Upload Error")).toBeVisible({
+      timeout: 15000,
+    });
+
+    await expect(
+      this.page.getByText("Invalid file type. Only CSV files are allowed."),
+    ).toBeVisible();
+  }
+
+  async selectMultipleContacts(count: number) {
+    await expect(this.contactCheckboxes.first()).toBeVisible({
+      timeout: 20000,
+    });
+
+    const total = await this.contactCheckboxes.count();
+    const limit = Math.min(count, total);
+
+    for (let i = 0; i < limit; i++) {
+      await this.contactCheckboxes.nth(i).check({ force: true });
+    }
+  }
+
+  async verifyAddToListButtonIsNotVisible() {
+    await expect(this.addToListBtn).toHaveCount(0);
+  }
 }

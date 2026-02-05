@@ -34,8 +34,14 @@ export class ContactListPage {
   readonly emptyListNameError: Locator;
   readonly invalidListNameError: Locator;
   readonly listItemByName: (name: string) => Locator;
-  readonly listCards: Locator;
+  // readonly listCards: Locator;
   readonly listCountText: Locator;
+
+  // readonly listMenuBtn: Locator;
+  readonly renameOption: Locator;
+  readonly duplicateOption: Locator;
+  readonly markInactiveOption: Locator;
+  readonly duplicateRenameError: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -116,8 +122,16 @@ export class ContactListPage {
 
     this.listCountText = page.getByText(/^\d+\s+contact lists$/i);
 
-    this.listCards = page.locator(
-      "div.rounded-xl.bg-primary.border.border-secondary",
+    this.renameOption = page.getByRole("menuitem", { name: "Rename List" });
+    this.duplicateOption = page.getByRole("menuitem", {
+      name: "Duplicate List",
+    });
+    this.markInactiveOption = page.getByRole("menuitem", {
+      name: "Mark as inactive",
+    });
+
+    this.duplicateRenameError = page.getByText(
+      /already exists in this organization/i,
     );
   }
 
@@ -187,58 +201,6 @@ export class ContactListPage {
     await this.email.fill(email);
     await this.createNewContBtn.click();
   }
-  // async createContactWithAllFields() {
-  //   await this.firstName.fill("Navya");
-  //   await this.lastName.fill("ddd");
-  //   await this.email.fill("navyadornala@test.com");
-
-  //   // await this.phone.click();
-  //   // await this.phone.press("Control+A");
-  //   // await this.phone.press("Backspace");
-
-  //   // await this.phone.click();
-
-  //   // await this.phone.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-  //   // await this.phone.press("Backspace");
-  //   // await this.phone.type("987654321", { delay: 100 });
-  //   // await this.phone.type("0", { delay: 150 });
-  //   // await this.phone.press("Enter");
-
-  //   await this.jobTitle.fill("QA");
-  //   await this.company.fill("Test Company");
-
-  //   await this.addressLine1.fill("MG Road");
-  //   await this.addressLine2.fill("Apartment 101");
-
-  //   await this.country.selectOption("IN");
-  //   await expect(this.state).toBeEnabled();
-  //   await expect(this.state.locator('option[value="KA"]')).toBeAttached();
-  //   await this.state.selectOption("KA");
-
-  //   await this.city.click();
-  //   await this.city.pressSequentially("Bengaluru", { delay: 100 });
-
-  //   await this.zipCode.fill("560001");
-  //   await this.notes.fill("Created via automation using POM");
-
-  //   await this.createNewContBtn.click();
-  //   await expect(this.createNewContactText).toBeVisible();
-  // }
-
-  //   async fillValidatedPhone(phoneNumber: string) {
-  //   await this.phone.click();
-
-  //   await this.phone.press(
-  //     process.platform === "darwin" ? "Meta+A" : "Control+A"
-  //   );
-  //   await this.phone.press("Backspace");
-
-  //   // force real value change
-  //   await this.phone.type(phoneNumber.slice(0, -1), { delay: 100 });
-  //   await this.phone.type(phoneNumber.slice(-1), { delay: 150 });
-
-  //   await this.phone.press("Enter");
-  // }
 
   async createContactWithAllFields(data: {
     firstName: string;
@@ -378,7 +340,6 @@ export class ContactListPage {
 
   async openCreateContactListPanel() {
     await this.newContactListBtn.click();
-    // await expect(this.listNameInput).toBeVisible();
   }
   async verifyListNameFieldIsFocused() {
     await expect(this.listNameInput).toBeFocused();
@@ -427,7 +388,6 @@ export class ContactListPage {
     await expect(this.createListBtn).toBeVisible({ timeout: 10000 });
     await expect(this.createListBtn).toBeEnabled();
 
-    // Playwright double click
     await this.createListBtn.dblclick();
   }
 
@@ -447,8 +407,112 @@ export class ContactListPage {
     const text = await this.listCountText.textContent();
     return Number(text?.match(/\d+/)?.[0]);
   }
+  listCard(listName: string) {
+    return this.page.locator("div.rounded-xl").filter({
+      has: this.page.getByRole("heading", {
+        name: listName,
+        exact: true,
+      }),
+    });
+  }
 
   async openListByIndex(index = 0) {
     await this.listCards.nth(index).click();
+  }
+
+  async ensureListsTabIsActive() {
+    const listsTab = this.page.getByRole("radio", { name: "Lists" });
+
+    if (!(await listsTab.getAttribute("aria-checked"))) {
+      await listsTab.click();
+    }
+
+    await expect(this.page.locator("div.rounded-xl").first()).toBeVisible({
+      timeout: 15000,
+    });
+  }
+  async waitForListCards() {
+    await expect(this.page.locator("div.rounded-xl").first()).toBeVisible({
+      timeout: 15000,
+    });
+  }
+  async openListMenu(listName: string) {
+    const card = this.listCard(listName);
+
+    await expect(card).toBeVisible({ timeout: 15000 });
+
+    const menuButton = card.getByRole("button", { name: "Open menu" });
+    await menuButton.click();
+
+    const menu = this.page.getByRole("menu");
+    await expect(menu).toBeVisible({ timeout: 5000 });
+
+    return menu;
+  }
+
+  async renameList(oldName: string, newName: string) {
+    await this.waitForListsLoaded();
+
+    const card = this.listCard(oldName);
+    await expect(card).toBeVisible({ timeout: 15000 });
+
+    await card.getByRole("button", { name: "Open menu" }).click();
+
+    const renameItem = this.page.getByRole("menuitemradio", {
+      name: "Rename List",
+    });
+    await renameItem.click();
+
+    const input = this.page.getByRole("textbox", { name: "List Name" });
+    await input.fill(newName);
+
+    await this.page.getByRole("button", { name: /save/i }).click();
+  }
+  async duplicateList(listName: string) {
+    const menu = await this.openListMenu(listName);
+
+    const duplicateItem = menu.getByRole("menuitemradio", {
+      name: "Duplicate List",
+    });
+
+    await expect(duplicateItem).toBeVisible({ timeout: 5000 });
+    await duplicateItem.click();
+  }
+
+  async markListInactive(listName: string) {
+    await this.switchToListsTab();
+
+    const menu = await this.openListMenu(listName);
+
+    const inactiveItem = menu.getByRole("menuitemradio", {
+      name: "Mark as Inactive",
+    });
+
+    await expect(inactiveItem).toBeVisible();
+    await inactiveItem.click();
+  }
+
+  async verifyListIsInactive(listName: string) {
+    await this.switchToListsTab();
+
+    const freshCard = this.listCard(listName);
+    await expect(freshCard).toBeVisible();
+
+    await expect(freshCard.locator("text=Inactive")).toBeVisible();
+  }
+
+  async verifyDuplicateRenameError() {
+    await expect(
+      this.page.getByText(/already exists in this organization/i),
+    ).toBeVisible({ timeout: 10000 });
+  }
+  async verifyDuplicateListCreated(originalName: string) {
+    await this.waitForListsLoaded();
+
+    const cards = this.page
+      .locator("div.rounded-xl")
+      .filter({ hasText: originalName });
+
+    await expect(cards).toHaveCount(2, { timeout: 15000 });
   }
 }
