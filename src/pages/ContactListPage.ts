@@ -34,14 +34,16 @@ export class ContactListPage {
   readonly emptyListNameError: Locator;
   readonly invalidListNameError: Locator;
   readonly listItemByName: (name: string) => Locator;
-  // readonly listCards: Locator;
   readonly listCountText: Locator;
-
-  // readonly listMenuBtn: Locator;
   readonly renameOption: Locator;
   readonly duplicateOption: Locator;
   readonly markInactiveOption: Locator;
   readonly duplicateRenameError: Locator;
+  readonly statusDropdown: Locator;
+  readonly archivedOption: Locator;
+  readonly applyFiltersBtn: Locator;
+  readonly duplicateListError: Locator;
+  readonly maxLengthListNameError: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -120,7 +122,7 @@ export class ContactListPage {
     this.listItemByName = (name: string) =>
       page.getByText(name, { exact: true });
 
-    this.listCountText = page.getByText(/^\d+\s+contact lists$/i);
+    this.listCountText = page.getByText(/contact lists/i);
 
     this.renameOption = page.getByRole("menuitem", { name: "Rename List" });
     this.duplicateOption = page.getByRole("menuitem", {
@@ -133,6 +135,20 @@ export class ContactListPage {
     this.duplicateRenameError = page.getByText(
       /already exists in this organization/i,
     );
+
+    this.duplicateListError = page.getByText(
+      "A list with this name already exists.",
+      { exact: true },
+    );
+
+    this.maxLengthListNameError = page.getByText(
+      "Contact list name must be less than 100 characters",
+      { exact: true },
+    );
+
+    this.statusDropdown = page.getByRole("button", { name: "Status" });
+    this.archivedOption = this.page.getByRole("option", { name: "Archived" });
+    this.applyFiltersBtn = page.getByRole("button", { name: "Apply filters" });
   }
 
   async captureScreenshot(name: string) {
@@ -140,6 +156,28 @@ export class ContactListPage {
       path: `screenshots/${name}.png`,
       fullPage: false,
     });
+  }
+  async addOneContact(searchText = "Navya") {
+    // 1️⃣ Open Add Contact panel
+    await this.addContactBtn.click();
+
+    // 2️⃣ Search for contact
+    await expect(this.searchInput).toBeVisible({ timeout: 10000 });
+    await this.searchInput.fill(searchText);
+
+    // 3️⃣ Wait for at least one checkbox
+    const checkboxes = this.page.getByRole("checkbox");
+    await expect(checkboxes.first()).toBeVisible({ timeout: 15000 });
+
+    // 4️⃣ Select first contact
+    await checkboxes.first().check({ force: true });
+
+    // 5️⃣ Click Add to List
+    await expect(this.addToListBtn).toBeEnabled({ timeout: 10000 });
+    await this.addToListBtn.click();
+
+    // 6️⃣ Wait for add to complete (button disabled or modal closed)
+    await expect(this.addToListBtn).toBeDisabled({ timeout: 10000 });
   }
 
   async verifyContactListPage() {
@@ -289,9 +327,9 @@ export class ContactListPage {
   }
 
   async getContactCount(): Promise<number> {
-    await expect(this.listCountText).toBeVisible();
+    await expect(this.listCountText.first()).toBeVisible({ timeout: 15000 });
 
-    const text = await this.listCountText.textContent();
+    const text = await this.listCountText.first().textContent();
     return Number(text?.match(/\d+/)?.[0]);
   }
 
@@ -324,12 +362,47 @@ export class ContactListPage {
     await this.createNewContBtn.click();
   }
 
+  listCard(listName: string) {
+    return this.page.locator("div.rounded-xl").filter({
+      has: this.page.getByRole("heading", {
+        name: listName,
+        exact: true,
+      }),
+    });
+  }
+
   async verifySpacesValidation() {
     await expect(this.firstNameError).toBeVisible();
   }
 
   async newContactListClickable() {
-    await this.newContactListBtn.click();
+    // 1️⃣ Wait for page to settle
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForLoadState("networkidle");
+
+    // 2️⃣ Ensure we are on LISTS tab (CRITICAL)
+    const listsTab = this.page.getByRole("radio", { name: "Lists" });
+
+    if (!(await listsTab.getAttribute("aria-checked"))) {
+      await listsTab.click();
+    }
+
+    // 3️⃣ Re-query button AFTER switching tab
+    const newContactListBtn = this.page.getByRole("button", {
+      name: "New Contact List",
+    });
+
+    // 4️⃣ Wait for button to appear
+    await expect(newContactListBtn).toBeVisible({ timeout: 30000 });
+    await expect(newContactListBtn).toBeEnabled({ timeout: 30000 });
+
+    // 5️⃣ Click
+    await newContactListBtn.click();
+
+    // 6️⃣ Confirm panel opened
+    await expect(this.page.getByLabel("Enter list name")).toBeVisible({
+      timeout: 30000,
+    });
   }
 
   async createContactList(listName: string) {
@@ -339,8 +412,27 @@ export class ContactListPage {
   }
 
   async openCreateContactListPanel() {
-    await this.newContactListBtn.click();
+    await this.ensureListsTabIsActive();
+
+    const btn = this.page.getByRole("button", { name: "New Contact List" });
+    await expect(btn).toBeVisible({ timeout: 20000 });
+    await expect(btn).toBeEnabled();
+
+    await btn.click();
+
+    await expect(this.listNameInput).toBeVisible({ timeout: 20000 });
   }
+
+  async waitForContactCreation() {
+    // Modal should close OR page should update
+    await Promise.race([
+      this.createNewContactText
+        .waitFor({ state: "hidden", timeout: 15000 })
+        .catch(() => {}),
+      this.page.waitForLoadState("networkidle"),
+    ]);
+  }
+
   async verifyListNameFieldIsFocused() {
     await expect(this.listNameInput).toBeFocused();
   }
@@ -348,6 +440,36 @@ export class ContactListPage {
   async verifyCreateButtonIsNotInteractable() {
     await expect(this.createListBtn).toBeDisabled();
   }
+
+async ensureContactsExist(count = 3) {
+  // Always create contacts from All Contacts
+  await this.page.goto("/contact-lists");
+  await this.allContactsTab.click();
+
+  // Pure alphabetic names
+  const firstNames = ["Alpha", "Bravo", "Charlie", "Delta", "Echo"];
+  const lastName = "Test";
+
+  for (let i = 0; i < count; i++) {
+    await expect(this.addContactBtn).toBeVisible({ timeout: 15000 });
+    await this.addContactBtn.click();
+
+    await expect(this.firstName).toBeVisible({ timeout: 15000 });
+
+    await this.firstName.fill(firstNames[i]);
+    await this.lastName.fill(lastName);
+
+    // Email can have timestamp (allowed)
+    await this.email.fill(`autouser${Date.now()}@test.com`);
+
+    await this.createNewContBtn.click();
+
+    // Confirm success
+    await expect(this.successText).toBeVisible({ timeout: 15000 });
+    await this.page.waitForLoadState("networkidle");
+  }
+}
+
 
   async openList(listName: string) {
     await this.listsTab.click();
@@ -396,18 +518,27 @@ export class ContactListPage {
   }
 
   async verifyListVisible(listName: string) {
-    await expect(this.listItemByName(listName)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(this.listCard(listName)).toBeVisible();
+  }
+
+  async verifyListNotVisible(listName: string) {
+    await expect(this.listCard(listName)).toHaveCount(0);
   }
 
   async getContactListCount(): Promise<number> {
-    await expect(this.listCountText).toBeVisible();
+    const countLabel = this.page.getByText(/contact lists/i).first();
 
-    const text = await this.listCountText.textContent();
+    await expect(countLabel).toBeVisible({ timeout: 15000 });
+
+    const text = await countLabel.textContent();
     return Number(text?.match(/\d+/)?.[0]);
   }
-  listCard(listName: string) {
+
+  async openListByIndex(index: number) {
+    await this.page.locator("div.rounded-xl").nth(index).click();
+  }
+
+  async listCardByName(listName: string) {
     return this.page.locator("div.rounded-xl").filter({
       has: this.page.getByRole("heading", {
         name: listName,
@@ -416,8 +547,9 @@ export class ContactListPage {
     });
   }
 
-  async openListByIndex(index = 0) {
-    await this.listCards.nth(index).click();
+  async waitForListToAppear(listName: string) {
+    const card = this.listCard(listName);
+    await expect(card).toBeVisible({ timeout: 30000 });
   }
 
   async ensureListsTabIsActive() {
@@ -441,17 +573,16 @@ export class ContactListPage {
 
     await expect(card).toBeVisible({ timeout: 15000 });
 
-    const menuButton = card.getByRole("button", { name: "Open menu" });
-    await menuButton.click();
+    await card.getByRole("button", { name: "Open menu" }).click();
 
     const menu = this.page.getByRole("menu");
-    await expect(menu).toBeVisible({ timeout: 5000 });
+    await expect(menu).toBeVisible();
 
     return menu;
   }
 
   async renameList(oldName: string, newName: string) {
-    await this.waitForListsLoaded();
+    // await this.waitForListsLoaded();
 
     const card = this.listCard(oldName);
     await expect(card).toBeVisible({ timeout: 15000 });
@@ -475,19 +606,19 @@ export class ContactListPage {
       name: "Duplicate List",
     });
 
-    await expect(duplicateItem).toBeVisible({ timeout: 5000 });
+    await expect(duplicateItem).toBeVisible();
     await duplicateItem.click();
   }
 
   async markListInactive(listName: string) {
-    await this.switchToListsTab();
+    await this.waitForListToAppear(listName);
 
-    const menu = await this.openListMenu(listName);
+    const card = this.listCard(listName);
+    await card.getByRole("button", { name: "Open menu" }).click();
 
-    const inactiveItem = menu.getByRole("menuitemradio", {
-      name: "Mark as Inactive",
+    const inactiveItem = this.page.getByText("Mark as Inactive", {
+      exact: true,
     });
-
     await expect(inactiveItem).toBeVisible();
     await inactiveItem.click();
   }
@@ -501,18 +632,94 @@ export class ContactListPage {
     await expect(freshCard.locator("text=Inactive")).toBeVisible();
   }
 
+  async applyInactiveFilter() {
+    await this.page.getByRole("checkbox", { name: /inactive/i }).check();
+  }
+  async waitForListsToReload() {
+    await this.page.waitForLoadState("networkidle");
+    await this.page
+      .locator("div.rounded-xl")
+      .first()
+      .waitFor({ state: "visible" });
+  }
+  async openStatusFilterSafely() {
+    // Wait until page is alive again
+    await expect(this.page.locator("body")).toBeVisible();
+
+    // Re-query element AFTER refresh
+    const statusFilter = this.page.getByText("Any status", { exact: true });
+
+    await expect(statusFilter).toBeVisible({ timeout: 20000 });
+    await expect(statusFilter).toBeEnabled();
+
+    await statusFilter.click();
+  }
+
+  async openStatusFilter() {
+    await this.page.getByText("Any status", { exact: true }).click();
+  }
+
+  async openFilterPanel() {
+    await this.page.getByRole("button", { name: /filter/i }).click();
+  }
   async verifyDuplicateRenameError() {
     await expect(
       this.page.getByText(/already exists in this organization/i),
     ).toBeVisible({ timeout: 10000 });
   }
+
+  async waitAfterMarkInactive() {
+    // wait for backend + UI settle
+    await this.page.waitForTimeout(1500);
+
+    // wait until any list card is visible again
+    await this.page.locator("div.rounded-xl").first().waitFor({
+      state: "visible",
+      timeout: 20000,
+    });
+  }
+
   async verifyDuplicateListCreated(originalName: string) {
-    await this.waitForListsLoaded();
+    // await this.waitForListsLoaded();
 
     const cards = this.page
       .locator("div.rounded-xl")
       .filter({ hasText: originalName });
 
     await expect(cards).toHaveCount(2, { timeout: 15000 });
+  }
+  async selectArchivedStatus() {
+    const archivedOption = this.page.getByRole("option", { name: "Archived" });
+    await archivedOption.click();
+  }
+
+  async applyFilters() {
+    await this.page.getByRole("button", { name: "Apply filters" }).click();
+  }
+
+  async openStatusDropdown() {
+    const statusBtn = this.page.getByRole("button", { name: "Status" });
+
+    await expect(statusBtn).toBeVisible({ timeout: 20000 });
+    await expect(statusBtn).toBeEnabled();
+
+    await statusBtn.click();
+  }
+
+  async openFilters() {
+    await this.page.getByRole("button", { name: /filters/i }).click();
+  }
+  async getContactCountFromCard(index = 0): Promise<number> {
+    const card = this.page.locator("div.rounded-xl").nth(index);
+
+    await expect(card).toBeVisible({ timeout: 15000 });
+
+    const countText = await card
+      .getByText(/contact/i) // more reliable than tabular-nums
+      .textContent();
+
+    const match = countText?.match(/\d+/);
+
+    return match ? Number(match[0]) : 0;
   }
 }
