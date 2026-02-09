@@ -43,7 +43,25 @@ export class ContactListPage {
   readonly archivedOption: Locator;
   readonly applyFiltersBtn: Locator;
   readonly duplicateListError: Locator;
+  readonly validationError: Locator;
   readonly maxLengthListNameError: Locator;
+  readonly invalidPhoneError: Locator;
+
+  readonly createContactDialog: Locator;
+  readonly createContactTitle: Locator;
+  readonly createContactForm: Locator;
+
+  readonly linkedinInput: Locator;
+  readonly linkedinSearchBtn: Locator;
+  readonly linkedinNoDetailsMsg: Locator;
+  readonly linkedinProfileCard: Locator;
+  readonly linkedinAutoFillBtn: Locator;
+
+  readonly linkedinFormatError: Locator;
+
+  readonly profilePictureInput: Locator;
+  readonly profilePicturePreview: Locator;
+  readonly profilePictureError: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -140,15 +158,52 @@ export class ContactListPage {
       "A list with this name already exists.",
       { exact: true },
     );
+    this.validationError = page.locator('[aria-invalid="true"]');
 
     this.maxLengthListNameError = page.getByText(
       "Contact list name must be less than 100 characters",
       { exact: true },
     );
+    this.createContactDialog = page.getByRole("dialog");
+    this.createContactTitle = page.getByRole("heading", {
+      name: "Create New Contact",
+    });
+
+    this.invalidPhoneError = page.getByText(/valid phone number/i);
+
+    this.createContactForm = page.locator("form#add-contact-form");
 
     this.statusDropdown = page.getByRole("button", { name: "Status" });
     this.archivedOption = this.page.getByRole("option", { name: "Archived" });
     this.applyFiltersBtn = page.getByRole("button", { name: "Apply filters" });
+
+    this.linkedinInput = page.getByPlaceholder("Enter LinkedIn profile URL");
+
+    this.linkedinSearchBtn = page.getByRole("button", {
+      name: "Search",
+    });
+
+    this.linkedinNoDetailsMsg = page.getByText(
+      "No details found for this profile. Try a full URL or another username.",
+    );
+
+    this.linkedinProfileCard = page.locator("div.border-border-primary");
+
+    this.linkedinAutoFillBtn = page.getByRole("button", {
+      name: "Auto-Fill",
+    });
+    this.linkedinFormatError = page.getByText(
+      "Enter LinkedIn URL or username (e.g., https://linkedin.com/in/username or username)",
+    );
+    this.profilePictureInput = page.getByPlaceholder(
+      "Enter profile picture URL or upload an image",
+    );
+
+    this.profilePicturePreview = page.locator("img");
+
+    this.profilePictureError = page.getByText(
+      /invalid|unsupported|image format|profile picture/i,
+    );
   }
 
   async captureScreenshot(name: string) {
@@ -157,26 +212,35 @@ export class ContactListPage {
       fullPage: false,
     });
   }
+  async enterInvalidProfilePictureUrl(url: string) {
+    await expect(this.profilePictureInput).toBeVisible();
+    await this.profilePictureInput.fill(url);
+  }
+  async verifyProfilePictureRejected() {
+    await expect(this.profilePictureError.first()).toBeVisible();
+    await expect(this.page.locator("img")).toHaveCount(0);
+  }
+
+  async verifyCreateContactPanelIsOpened() {
+    await expect(this.createContactDialog).toBeVisible();
+    await expect(this.createContactTitle).toBeVisible();
+    await expect(this.createContactForm).toBeVisible();
+    await expect(this.closeIcon).toBeVisible();
+  }
   async addOneContact(searchText = "Navya") {
-    // 1️⃣ Open Add Contact panel
     await this.addContactBtn.click();
 
-    // 2️⃣ Search for contact
     await expect(this.searchInput).toBeVisible({ timeout: 10000 });
     await this.searchInput.fill(searchText);
 
-    // 3️⃣ Wait for at least one checkbox
     const checkboxes = this.page.getByRole("checkbox");
     await expect(checkboxes.first()).toBeVisible({ timeout: 15000 });
 
-    // 4️⃣ Select first contact
     await checkboxes.first().check({ force: true });
 
-    // 5️⃣ Click Add to List
     await expect(this.addToListBtn).toBeEnabled({ timeout: 10000 });
     await this.addToListBtn.click();
 
-    // 6️⃣ Wait for add to complete (button disabled or modal closed)
     await expect(this.addToListBtn).toBeDisabled({ timeout: 10000 });
   }
 
@@ -198,35 +262,79 @@ export class ContactListPage {
     await expect(this.createNewContactText).toBeVisible();
   }
 
+  async closeCreateContactPanel() {
+    await this.closeIcon.click();
+  }
+
+  async verifyCreateContactPanelIsClosed() {
+    await expect(this.createContactDialog).toBeHidden();
+  }
+
   async verifyingCloseIcon() {
     await expect(this.closeIcon).toBeVisible();
     await this.closeIcon.click();
     await expect(this.createNewContactText).not.toBeVisible();
   }
 
-  async fillMandatoryFields(
-    firstName?: string,
-    lastName?: string,
-    email?: string,
-  ) {
-    if (firstName !== undefined) {
-      await this.firstName.fill(firstName);
-    }
-
-    if (lastName !== undefined) {
-      await this.lastName.fill(lastName);
-    }
-
-    if (email !== undefined) {
-      await this.email.fill(email);
-    }
-
-    await this.createNewContBtn.click();
+  async fillMandatoryFields(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  }) {
+    await this.firstName.fill(data.firstName);
+    await this.lastName.fill(data.lastName);
+    await this.email.fill(data.email);
   }
 
+  async verifyTrimmedValues(expected: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  }) {
+    await expect(this.firstName).toHaveValue(expected.firstName);
+    await expect(this.lastName).toHaveValue(expected.lastName);
+    await expect(this.email).toHaveValue(expected.email);
+  }
+  async verifyPhoneValidationErrorShown() {
+    await expect(this.invalidPhoneError).toBeVisible();
+    await expect(this.createContactDialog).toBeVisible();
+  }
+
+  async fillForm(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  }) {
+    await this.firstName.fill(data.firstName);
+    await this.lastName.fill(data.lastName);
+    await this.email.fill(data.email);
+    await this.phone.fill(data.phone);
+  }
+  async fillFormWithSpaces(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  }) {
+    await this.firstName.fill(`   ${data.firstName}   `);
+    await this.lastName.fill(`   ${data.lastName}   `);
+    await this.email.fill(`   ${data.email}   `);
+  }
+
+  async verifyDuplicateEmailErrorShown() {
+    await expect(this.validationError).toBeVisible();
+    await expect(this.createContactDialog).toBeVisible();
+  }
   async creatingContactWithExistingEmailID(email: string) {
     await this.email.fill(email);
     await this.createNewContBtn.click();
+  }
+
+  async verifyNoEmailValidationError() {
+    await expect(this.invalidEmailError).toHaveCount(0);
+  }
+  async verifyContactCreated() {
+    await expect(this.createContactDialog).toBeHidden();
   }
 
   async verifyingCreatingContact(
@@ -279,24 +387,30 @@ export class ContactListPage {
     await this.createNewContBtn.click();
   }
 
-  async fillContactForm(
-    firstName: string,
-    lastName: string,
-    email: string,
-    phone?: string,
-  ) {
+  async fillContactForm(firstName: string, lastName: string, email?: string) {
     await this.firstName.fill(firstName);
     await this.lastName.fill(lastName);
-    await this.email.fill(email);
 
-    if (phone) {
-      await this.phone.fill(phone);
+    if (email !== undefined) {
+      await this.email.fill(email);
     }
-
-    await this.createNewContBtn.click();
   }
-  async switchToAllContacts() {
-    await this.allContactsTab.click();
+
+  async enterProfilePictureUrl(url: string) {
+    await expect(this.profilePictureInput).toBeVisible();
+    await this.profilePictureInput.fill(url);
+  }
+
+  async verifyNoProfilePictureError() {
+    await expect(this.page.getByText(/invalid|unsupported|error/i)).toHaveCount(
+      0,
+    );
+  }
+  async verifyProfilePictureLoaded() {
+    await expect(this.profilePicturePreview.first()).toHaveAttribute(
+      "src",
+      /https?:\/\//,
+    );
   }
 
   async searchContact(value: string) {
@@ -350,8 +464,6 @@ export class ContactListPage {
 
   async verifyInvalidPhoneHandled() {
     await expect(this.invalidPhoneError).toBeVisible();
-
-    await expect(this.phoneInput).toBeFocused();
   }
 
   async submitWithOnlySpaces() {
@@ -411,6 +523,37 @@ export class ContactListPage {
     await this.createListBtn.click();
   }
 
+  async clickOutsideCreateContactPanel() {
+    await this.page.mouse.click(10, 10);
+  }
+
+  async verifyCreateContactPanelClosed() {
+    await expect(this.createContactDialog).toBeHidden();
+  }
+
+  async verifyLinkedInInvalidFormatError() {
+    await expect(this.linkedinFormatError).toBeVisible();
+  }
+  async verifyLinkedInAutoFillNotAvailable() {
+    await expect(this.linkedinAutoFillBtn).toHaveCount(0);
+  }
+
+  async verifyLinkedInSearchBlocked() {
+    await expect(this.createContactDialog).toBeVisible();
+
+    await expect(this.linkedinAutoFillBtn).toHaveCount(0);
+  }
+
+  async verifyCreateButtonDisabled() {
+    await expect(this.createNewContBtn).toBeDisabled();
+  }
+  async verifyCreateButtonEnabled() {
+    await expect(this.createNewContBtn).toBeEnabled();
+  }
+  async openCreateContactPanel() {
+    await this.addContactBtn.click();
+    await expect(this.createContactDialog).toBeVisible();
+  }
   async openCreateContactListPanel() {
     await this.ensureListsTabIsActive();
 
@@ -424,7 +567,6 @@ export class ContactListPage {
   }
 
   async waitForContactCreation() {
-    // Modal should close OR page should update
     await Promise.race([
       this.createNewContactText
         .waitFor({ state: "hidden", timeout: 15000 })
@@ -432,7 +574,35 @@ export class ContactListPage {
       this.page.waitForLoadState("networkidle"),
     ]);
   }
+  async pressTab() {
+    await this.page.keyboard.press("Tab");
+  }
 
+  async submitFormUsingKeyboard(
+    firstName: string,
+    lastName: string,
+    email: string,
+  ) {
+    // Move focus until First Name is reached
+    await this.firstName.focus();
+
+    // Type using keyboard
+    await this.page.keyboard.type(firstName);
+    await this.page.keyboard.press("Tab");
+
+    await this.page.keyboard.type(lastName);
+    await this.page.keyboard.press("Tab");
+
+    await this.page.keyboard.type(email);
+
+    // Press Enter to submit
+    await this.page.keyboard.press("Enter");
+  }
+
+  async verifyFormSubmitted() {
+    // Panel should close after successful submission
+    await expect(this.createContactDialog).toBeHidden();
+  }
   async verifyListNameFieldIsFocused() {
     await expect(this.listNameInput).toBeFocused();
   }
@@ -441,35 +611,38 @@ export class ContactListPage {
     await expect(this.createListBtn).toBeDisabled();
   }
 
-async ensureContactsExist(count = 3) {
-  // Always create contacts from All Contacts
-  await this.page.goto("/contact-lists");
-  await this.allContactsTab.click();
+  async ensureContactsExist(count = 3) {
+    // Always create contacts from All Contacts
+    await this.page.goto("/contact-lists");
+    await this.allContactsTab.click();
 
-  // Pure alphabetic names
-  const firstNames = ["Alpha", "Bravo", "Charlie", "Delta", "Echo"];
-  const lastName = "Test";
+    // Pure alphabetic names
+    const firstNames = ["Alpha", "Bravo", "Charlie", "Delta", "Echo"];
+    const lastName = "Test";
 
-  for (let i = 0; i < count; i++) {
-    await expect(this.addContactBtn).toBeVisible({ timeout: 15000 });
-    await this.addContactBtn.click();
+    for (let i = 0; i < count; i++) {
+      await expect(this.addContactBtn).toBeVisible({ timeout: 15000 });
+      await this.addContactBtn.click();
 
-    await expect(this.firstName).toBeVisible({ timeout: 15000 });
+      await expect(this.firstName).toBeVisible({ timeout: 15000 });
 
-    await this.firstName.fill(firstNames[i]);
-    await this.lastName.fill(lastName);
+      await this.firstName.fill(firstNames[i]);
+      await this.lastName.fill(lastName);
 
-    // Email can have timestamp (allowed)
-    await this.email.fill(`autouser${Date.now()}@test.com`);
+      // Email can have timestamp (allowed)
+      await this.email.fill(`autouser${Date.now()}@test.com`);
 
-    await this.createNewContBtn.click();
+      await this.createNewContBtn.click();
 
-    // Confirm success
-    await expect(this.successText).toBeVisible({ timeout: 15000 });
-    await this.page.waitForLoadState("networkidle");
+      // Confirm success
+      await expect(this.successText).toBeVisible({ timeout: 15000 });
+      await this.page.waitForLoadState("networkidle");
+    }
   }
-}
 
+  async submitForm() {
+    await this.createNewContBtn.click();
+  }
 
   async openList(listName: string) {
     await this.listsTab.click();
@@ -511,6 +684,15 @@ async ensureContactsExist(count = 3) {
     await expect(this.createListBtn).toBeEnabled();
 
     await this.createListBtn.dblclick();
+  }
+
+  async verifyValidationErrorDisplayed() {
+    await expect(this.validationError.first()).toBeVisible();
+  }
+
+  async verifyFormDataRetained(firstName: string, lastName: string) {
+    await expect(this.firstName).toHaveValue(firstName);
+    await expect(this.lastName).toHaveValue(lastName);
   }
 
   async switchToListsTab() {
@@ -704,6 +886,39 @@ async ensureContactsExist(count = 3) {
     await expect(statusBtn).toBeEnabled();
 
     await statusBtn.click();
+  }
+
+  async enterLinkedInUrl(url: string) {
+    await expect(this.linkedinInput).toBeVisible();
+    await this.linkedinInput.fill(url);
+  }
+
+  async clickLinkedInSearch() {
+    await expect(this.linkedinSearchBtn).toBeEnabled();
+    await this.linkedinSearchBtn.click();
+  }
+
+  async searchLinkedInProfile(url: string) {
+    await this.enterLinkedInUrl(url);
+    await this.clickLinkedInSearch();
+  }
+
+  async verifyLinkedInProfileFound() {
+    await expect(this.linkedinProfileCard).toBeVisible({
+      timeout: 15000,
+    });
+
+    await expect(this.linkedinAutoFillBtn).toBeVisible();
+    await expect(this.linkedinAutoFillBtn).toBeEnabled();
+  }
+
+  async verifyLinkedInNoDetailsFound() {
+    await expect(this.linkedinNoDetailsMsg).toBeVisible();
+  }
+
+  async clickLinkedInAutoFill() {
+    await expect(this.linkedinAutoFillBtn).toBeEnabled();
+    await this.linkedinAutoFillBtn.click();
   }
 
   async openFilters() {

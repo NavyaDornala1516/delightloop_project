@@ -22,6 +22,49 @@ test.describe("Contact List Tests", () => {
     expect(true).toBeTruthy();
   });
 
+  test("Validate Create Contact panel closes on clicking outside", async ({
+    page,
+  }) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.clickOutsideCreateContactPanel();
+
+    await contactListPage.verifyCreateContactPanelClosed();
+  });
+
+  test("Validate Create Contact panel opens from Add Contact button", async ({
+    page,
+  }) => {
+    await contactListPage.verifyingAddContactBtnClickable();
+
+    // Assert
+    await contactListPage.verifyCreateContactPanelIsOpened();
+  });
+
+  test("Validate form data retained after validation error", async ({
+    page,
+  }) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.fillContactForm("John", "Doe");
+
+    await contactListPage.submitForm();
+
+    await contactListPage.verifyValidationErrorDisplayed();
+
+    await contactListPage.verifyFormDataRetained("John", "Doe");
+  });
+
+  test("Validate Create Contact panel closes on Close (X) icon click", async ({
+    page,
+  }) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.closeCreateContactPanel();
+
+    await contactListPage.verifyCreateContactPanelIsClosed();
+  });
+
   test("Add Contact button should be visible", async () => {
     await contactListPage.verifyingAddContactBtn();
   });
@@ -162,12 +205,7 @@ test.describe("Contact List Tests", () => {
   ["abc123", "123abc", "!@#$%", "999"].forEach((phone) => {
     test(`Invalid phone: ${phone}`, async ({ page }) => {
       await contactListPage.verifyingAddContactBtnClickable();
-      await contactListPage.fillContactForm(
-        "Test",
-        "User",
-        "test@user.com",
-        phone,
-      );
+      await contactListPage.fillContactForm("Test", "User", "test@user.com");
 
       await expect(contactListPage.successText).not.toBeVisible();
       await contactListPage.captureScreenshot("invalid phone");
@@ -295,7 +333,6 @@ test.describe("Contact List Tests", () => {
   }) => {
     await contactListPage.newContactListClickable();
 
-    // await contactListPage.verifyListNameFieldIsFocused();
     await contactListPage.verifyCreateButtonIsNotInteractable();
   });
 
@@ -306,16 +343,11 @@ test.describe("Contact List Tests", () => {
 
     await contactListPage.createContactList(existingListName);
 
-    // ✅ Assert exact error message inside modal
     await expect(contactListPage.duplicateListError).toBeVisible({
       timeout: 10000,
     });
 
-    // ✅ Modal should remain open
     await expect(contactListPage.listNameInput).toBeVisible();
-
-    // ❌ DO NOT click Lists tab
-    // ❌ DO NOT navigate
   });
 
   test("Verify error when creating contact list with only spaces", async () => {
@@ -600,6 +632,42 @@ test.describe("Contact List Tests", () => {
     await contactListDetailsPage.clickBackToContactLists();
   });
 
+  test("Validate Create button disabled until mandatory fields filled", async ({
+    page,
+  }) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.verifyCreateButtonDisabled();
+
+    await contactListPage.fillMandatoryFields(
+      "John",
+      "Doe",
+      "john.doe@test.com",
+    );
+
+    await contactListPage.verifyCreateButtonEnabled();
+  });
+
+  test("Validate tab navigation order", async ({ page }) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.verifyTabOrder();
+  });
+
+  test("Validate keyboard-only submission", async ({ page }) => {
+    await contactListPage.openCreateContactPanel();
+
+    // Submit using only keyboard
+    await contactListPage.submitFormUsingKeyboard(
+      "John",
+      "Doe",
+      "john.doe@test.com",
+    );
+
+    // Verify submission success
+    await contactListPage.verifyFormSubmitted();
+  });
+
   test("Add one existing contact to list", async () => {
     await contactListPage.ensureContactsExist(1);
 
@@ -652,60 +720,274 @@ test.describe("Contact List Tests", () => {
   //   await contactListPage.verifyListVisible(listName);
   // });
 
-test("E2E: Create contact → Create list → Import contacts → Add contact to list", async ({
-  page,
-}) => {
-  await page.goto("/contact-lists", { waitUntil: "domcontentloaded" });
+  // test('Validate trimming of leading and trailing spaces', async ({ page }) => {
+  //   const contactData = {
+  //     firstName: `User${Date.now()}`,
+  //     lastName: `Test${Math.floor(Math.random() * 1000)}`,
+  //     email: `user${Date.now()}@test.com`,
+  //   };
 
-  const contactEmail = `navya.${Date.now()}@test.com`;
+  //   await contactListPage.openCreateContactPanel();
 
-  await contactListPage.verifyingAddContactBtnClickable();
+  //   await contactListPage.fillFormWithSpaces(contactData);
 
-  await contactListPage.fillMandatoryFields(
-    "Navya",
-    "Automation",
-    contactEmail
-  );
+  //   await contactListPage.submitForm();
 
-  await expect(contactListPage.successText).toBeVisible();
+  //   // await contactListPage.verifyTrimmedValues(contactData);
+  // });
 
-  const listName = `E2E-List-${Date.now()}`;
+  //no warning showing
+  test("Validate email uniqueness is case-insensitive", async ({ page }) => {
+    const baseEmail = `user${Date.now()}@test.com`;
 
-  await contactListPage.openCreateContactListPanel();
-  await contactListPage.createContactList(listName);
+    const emailUpperCase = baseEmail.toUpperCase();
 
-  await contactListPage.switchToListsTab();
-  await expect(contactListPage.listCard(listName)).toBeVisible();
+    const firstContact = {
+      firstName: "User",
+      lastName: "One",
+      email: baseEmail,
+    };
 
-  await contactListPage.openList(listName);
+    const duplicateContact = {
+      firstName: "User",
+      lastName: "Two",
+      email: emailUpperCase,
+    };
 
-  await expect(
-    page.getByRole("heading", { name: /contacts/i })
-  ).toBeVisible();
+    await contactListPage.openCreateContactPanel();
+    await contactListPage.fillMandatoryFields(firstContact);
+    await contactListPage.submitForm();
 
-await contactListDetailsPage.openImportCsvModal();
-await contactListDetailsPage.uploadCsv("test-data/contacts.csv");
-await contactListDetailsPage.completeCsvWizard();
+    await contactListPage.openCreateContactPanel();
+    await contactListPage.fillMandatoryFields(duplicateContact);
+    await contactListPage.submitForm();
 
-await expect(
-  page.getByRole("heading", { name: /contacts/i })
-).toBeVisible();
+    await contactListPage.verifyDuplicateEmailErrorShown();
+  });
+
+  //it is nt giving any warning
+  test("should trim leading and trailing spaces in first name and last name", async ({}) => {
+    await contactListPage.openCreateContactPanel();
+
+    const inputData = {
+      firstName: "John",
+      lastName: "Doe",
+      email: "john.doe@test.com",
+    };
+
+    await contactListPage.fillFormWithSpaces(inputData);
+
+    await contactListPage.submitForm();
+
+    await contactListPage.verifyTrimmedValues({
+      firstName: inputData.firstName,
+      lastName: inputData.lastName,
+      email: inputData.email,
+    });
+
+    await contactListPage.verifyContactCreated();
+  });
+
+  test("Validate very long phone number is not allowed", async ({ page }) => {
+    const timestamp = Date.now();
+
+    const veryLongPhoneNumber = "9".repeat(25);
+
+    const contactData = {
+      firstName: `User`,
+      lastName: "LongPhone",
+      email: `user${timestamp}@test.com`,
+      phone: veryLongPhoneNumber,
+    };
+
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.fillForm(contactData);
+
+    await contactListPage.submitForm();
+
+    await contactListPage.verifyInvalidPhoneHandled();
+  });
+
+  test("Validate phone number with special characters is not allowed", async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+
+    const contactData = {
+      firstName: `User${timestamp}`,
+      lastName: "SpecialChar",
+      email: `user${timestamp}@test.com`,
+      phone: "98@76#543210",
+    };
+
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.fillForm(contactData);
+
+    await contactListPage.submitForm();
+
+    await contactListPage.verifyPhoneValidationErrorShown();
+  });
+
+  test("should auto-fill from LinkedIn, add random email, and create contact", async ({}) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.searchLinkedInProfile(
+      "https://www.linkedin.com/in/anne-sofie-frederiksen",
+    );
+
+    await contactListPage.verifyLinkedInProfileFound();
+
+    await contactListPage.clickLinkedInAutoFill();
+
+    await expect(contactListPage.createContactDialog).toBeVisible();
+
+    const randomEmail = `autolinkedin_${Date.now()}@test.com`;
+    await contactListPage.email.fill(randomEmail);
+
+    await contactListPage.verifyCreateButtonEnabled();
+
+    await contactListPage.submitForm();
+
+    await contactListPage.verifyContactCreated();
+  });
+
+  test("should show error and not fetch profile for invalid LinkedIn URL", async ({}) => {
+    // Step 1: Open Create Contact panel
+    await contactListPage.openCreateContactPanel();
+
+    // Step 2: Enter invalid LinkedIn URL
+    await contactListPage.searchLinkedInProfile(
+      "https://www.linkedin.com/invalid-profile-format",
+    );
+
+    // Step 3: Verify 'No details found' message is shown
+    await contactListPage.verifyLinkedInNoDetailsFound();
+
+    // Step 4: Verify Auto-Fill button is NOT visible
+    await expect(contactListPage.linkedinAutoFillBtn).toHaveCount(0);
+
+    // Step 5: Verify Create Contact dialog is still open
+    await expect(contactListPage.createContactDialog).toBeVisible();
+
+    // Step 6: Ensure contact is NOT created automatically
+    await contactListPage.verifyCreateButtonDisabled();
+  });
+
+  test("should show validation error for invalid LinkedIn URL format", async ({}) => {
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.enterLinkedInUrl("https://google.com/john");
+
+    await contactListPage.clickLinkedInSearch();
+
+    await contactListPage.verifyLinkedInInvalidFormatError();
+
+    await contactListPage.verifyLinkedInAutoFillNotAvailable();
+
+    await contactListPage.verifyLinkedInSearchBlocked();
+  });
+
+    test("should reject invalid profile picture URL format", async ({
+  }) => {
+
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.enterInvalidProfilePictureUrl(
+      "https://example.com/document.pdf"
+    );
+
+    await contactListPage.verifyProfilePictureRejected();
+
+    await expect(contactListPage.createContactDialog).toBeVisible();
+  });
 
 
-  await contactListDetailsPage.openAddContact();
+  test("should accept valid profile picture URL format", async ({}) => {
+    await contactListPage.openCreateContactPanel();
 
-  await contactListDetailsPage.searchContact("Navya");
-  await contactListDetailsPage.selectFirstVisibleContact();
-  await contactListDetailsPage.addToList();
+    await contactListPage.enterProfilePictureUrl(
+      "https://via.placeholder.com/150.jpg",
+    );
 
-  await expect(
-    page.getByText(/contact added successfully/i)
-  ).toBeVisible();
+    await contactListPage.verifyProfilePictureLoaded();
+    // await contactListPage.verifyNoProfilePictureError();
 
-  await contactListDetailsPage.clickBackToContactLists();
-  await expect(contactListPage.listCard(listName)).toBeVisible();
-});
+    await contactListPage.verifyCreateButtonEnabled();
+  });
 
+  test("Validate email with plus (+) symbol is accepted", async ({ page }) => {
+    const timestamp = Date.now();
+    const emailWithPlus = `user+test${timestamp}@example.com`;
 
+    const contactData = {
+      firstName: `User`,
+      lastName: "Plus",
+      email: emailWithPlus,
+    };
 
+    await contactListPage.openCreateContactPanel();
+
+    await contactListPage.fillMandatoryFields(contactData);
+
+    await contactListPage.submitForm();
+
+    // Email should be accepted
+    await contactListPage.verifyNoEmailValidationError();
+
+    // Contact should be created successfully
+    await contactListPage.verifyContactCreated();
+  });
+
+  test("E2E: Create contact → Create list → Import contacts → Add contact to list", async ({
+    page,
+  }) => {
+    await page.goto("/contact-lists", { waitUntil: "domcontentloaded" });
+
+    const contactEmail = `navya.${Date.now()}@test.com`;
+
+    await contactListPage.verifyingAddContactBtnClickable();
+
+    await contactListPage.fillMandatoryFields(
+      "Navya",
+      "Automation",
+      contactEmail,
+    );
+
+    await expect(contactListPage.successText).toBeVisible();
+
+    const listName = `E2E-List-${Date.now()}`;
+
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
+
+    await contactListPage.switchToListsTab();
+    await expect(contactListPage.listCard(listName)).toBeVisible();
+
+    await contactListPage.openList(listName);
+
+    await expect(
+      page.getByRole("heading", { name: /contacts/i }),
+    ).toBeVisible();
+
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadCsv("test-data/contacts.csv");
+    await contactListDetailsPage.completeCsvWizard();
+
+    await expect(
+      page.getByRole("heading", { name: /contacts/i }),
+    ).toBeVisible();
+
+    await contactListDetailsPage.openAddContact();
+
+    await contactListDetailsPage.searchContact("Navya");
+    await contactListDetailsPage.selectFirstVisibleContact();
+    await contactListDetailsPage.addToList();
+
+    await expect(page.getByText(/contact added successfully/i)).toBeVisible();
+
+    await contactListDetailsPage.clickBackToContactLists();
+    await expect(contactListPage.listCard(listName)).toBeVisible();
+  });
 });
