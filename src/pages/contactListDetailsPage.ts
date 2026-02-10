@@ -110,70 +110,80 @@ export class ContactListDetailsPage {
     await expect(this.importContactBtn).toBeEnabled({ timeout: 30000 });
     await this.importContactBtn.click();
   }
-  async openAddContact() {
-    // 1️⃣ Wait for contacts page to be fully ready
+
+async openAddContact(expectModal = true) {
+  // 1️⃣ Wait for page to fully stabilize after navigation/import
+  await this.page.waitForLoadState("networkidle");
+
+  // 2️⃣ Locate button JUST before clicking (no cached locator)
+  const addContactBtn = this.page.getByRole("button", {
+    name: /add contact/i,
+  });
+
+  // 3️⃣ Ensure it's visible & enabled
+  await expect(addContactBtn).toBeVisible({ timeout: 20000 });
+  await expect(addContactBtn).toBeEnabled();
+
+  // 4️⃣ Click
+  await addContactBtn.click();
+
+  // 5️⃣ Verify modal opened (VERY IMPORTANT)
+  if (expectModal) {
     await expect(
-      this.page.getByRole("heading", { name: /contacts/i }),
+      this.page.getByRole("dialog"),
     ).toBeVisible({ timeout: 20000 });
-
-    const addContactBtn = this.page
-      .locator("main")
-      .getByRole("button", { name: "Add Contact" });
-
-    // 2️⃣ Ensure button is interactable
-    await expect(addContactBtn).toBeVisible({ timeout: 20000 });
-    await expect(addContactBtn).toBeEnabled();
-
-    // 3️⃣ Click (do NOT assume it worked)
-    await addContactBtn.click();
-
-    const searchInput = this.page.getByPlaceholder(
-      "Search contacts by name or email...",
-    );
-
-    // 4️⃣ Verify panel opened — if not, retry once
-    try {
-      await expect(searchInput).toBeVisible({ timeout: 5000 });
-    } catch {
-      // React sometimes ignores first click after refresh
-      await addContactBtn.click();
-      await expect(searchInput).toBeVisible({ timeout: 10000 });
-    }
   }
-async searchContact(text: string) {
+}
+
+
+
+async searchContact(name: string) {
+  // 1️⃣ Wait for panel to fully mount & settle
+  await this.page.waitForLoadState("networkidle");
+
+  // 2️⃣ Always locate JUST before interaction
   const searchInput = this.page.getByPlaceholder(
-    "Search contacts by name or email..."
+    /search contacts by name or email/i,
   );
 
+  // 3️⃣ Ensure input is attached & ready
   await expect(searchInput).toBeVisible({ timeout: 20000 });
-  await searchInput.fill(text);
+  await expect(searchInput).toBeEnabled();
 
-  // ✅ Wait for at least ONE contact EMAIL to appear
+  // 4️⃣ Clear safely (important for re-renders)
+  // await searchInput.fill("");
+
+  // 5️⃣ Type (NOT fill — safer for React inputs)
+  await searchInput.type(name, { delay: 50 });
+
+  // 6️⃣ Wait for results to appear
   await expect(
-    this.page.locator('a[href^="mailto:"]').first()
+    this.page.getByRole("row").first(),
   ).toBeVisible({ timeout: 20000 });
 }
+
 
 
 
 async selectFirstVisibleContact() {
-  // Ensure Add Contact panel is open
-  await expect(
-    this.page.getByPlaceholder("Search contacts by name or email...")
-  ).toBeVisible({ timeout: 20000 });
+  // 1️⃣ Wait for at least one visible contact row AFTER search
+  const firstResultRow = this.page
+    .getByRole("row")
+    .filter({
+      has: this.page.locator("td").first(), // ensures it's a data row
+    })
+    .first();
 
-  // ⚠️ Do NOT store the locator long-term
-  const contactCards = this.page.locator('div[role="button"]');
+  await expect(firstResultRow).toBeVisible({ timeout: 20000 });
 
-  // Wait until at least one card exists
-  await expect(contactCards.first()).toBeAttached({ timeout: 20000 });
+  // 2️⃣ Click the row (safe now)
+  await firstResultRow.click();
 
-  // 🔒 Click while EXPECTING the UI to change
-  await Promise.all([
-    contactCards.first().click(),
-    this.addToListBtn.waitFor({ state: "enabled", timeout: 20000 }),
-  ]);
+  // 3️⃣ Wait for Add to List button to become enabled
+  await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
 }
+
+
 
 
   async addSelectedContactToList() {
@@ -210,9 +220,16 @@ async selectFirstVisibleContact() {
     await expect(this.addToListBtn).toBeEnabled({ timeout: 20000 });
   }
 
-  async addToList() {
-    await this.addToListBtn.click();
-  }
+async addToList() {
+  await expect(this.addToListBtn).toBeEnabled();
+  await this.addToListBtn.click();
+}
+
+async verifyDuplicateEmailErrorShown() {
+  await expect(this.validationError).toBeVisible();
+  await expect(this.createContactDialog).toBeVisible();
+}
+
 
   async waitForContactCountIncrease(previousCount: number) {
     const countLabel = this.page.getByText(/contacts/i);
