@@ -12,7 +12,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 5 : undefined,
 
-  reporter: "html",
+  reporter: [
+    ['html', { outputFolder: `playwright-report/${Date.now()}`, open: 'never' }]
+  ],
 
   use: {
     baseURL: process.env.BASE_URL,

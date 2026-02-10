@@ -694,15 +694,22 @@ test.describe("Contact List Tests", () => {
   test("Validate Create button disabled until mandatory fields filled", async ({
     page,
   }) => {
+
+
+    const email = `manual.address@test.com ${Date.now()}` 
+
     await contactListPage.openCreateContactPanel();
 
     await contactListPage.submitForm();
     await expect(contactListPage.createContactDialog).toBeVisible();
-    await contactListPage.fillMandatoryFields(
-      "John",
-      "Doe",
-      "john.doe@test.com",
-    );
+  
+
+     await contactListPage.fillMandatoryFields({
+      firstName: "John",
+      lastName: "Doe",
+      email: email,
+    });
+
 
     await contactListPage.verifyCreateButtonEnabled();
   });
@@ -745,7 +752,7 @@ test.describe("Contact List Tests", () => {
 
   test("Validate trimming of leading and trailing spaces", async ({ page }) => {
     const contactData = {
-      firstName: `User$`,
+      firstName: `User`,
       lastName: `Test`,
       email: `user${Date.now()}@test.com`,
     };
@@ -756,7 +763,7 @@ test.describe("Contact List Tests", () => {
 
     await contactListPage.submitForm();
 
-    // await contactListPage.verifyTrimmedValues(contactData);
+    await contactListPage.verifyTrimmedValues(contactData);
   });
 
   //no warning showing
@@ -1280,4 +1287,95 @@ test.describe("Contact List Tests", () => {
   //   await contactListDetailsPage.clickBackToContactLists();
   //   await expect(contactListPage.listCard(listName)).toBeVisible();
   // });
+
+
+
+test("Verify creating contact list with special characters", async ({ page }) => {
+  const invalidListName = `Test@#$% ${Date.now()}`;
+
+  await contactListPage.openCreateContactListPanel();
+
+  await contactListPage.createContactList(invalidListName);
+
+  await expect(
+    page.getByText(/list created successfully/i),
+  ).not.toBeVisible();
+
+});
+
+test("Verify creating contact list with maximum allowed characters", async () => {
+  const timestamp = Date.now().toString();
+  const baseLength = 100 - timestamp.length - 1;
+
+  const maxLengthName = `${"A".repeat(baseLength)}-${timestamp}`;
+
+  expect(maxLengthName.length).toBe(100);
+
+  await contactListPage.openCreateContactListPanel();
+  await contactListPage.createContactList(maxLengthName);
+
+  await expect(contactListPage.listCard(maxLengthName)).toBeVisible();
+});
+
+
+test("Verify list search returns correct results", async () => {
+  await contactListPage.switchToListsTab();
+
+  const matchList = `Search-Match-${Date.now()}`;
+  const otherList = `Search-Other-${Date.now() + 1}`;
+
+  await contactListPage.openCreateContactListPanel();
+  await contactListPage.createContactList(matchList);
+
+  await contactListPage.openCreateContactListPanel();
+  await contactListPage.createContactList(otherList);
+
+  await contactListPage.searchList(matchList);
+
+  await expect(contactListPage.listCard(matchList)).toBeVisible();
+
+  await expect(contactListPage.listCard(otherList)).toHaveCount(0);
+});
+
+test("Verify list search is case-insensitive", async () => {
+  await contactListPage.switchToListsTab();
+
+  const listName = `CaseTest-${Date.now()}`;
+
+  await contactListPage.openCreateContactListPanel();
+  await contactListPage.createContactList(listName);
+
+  await contactListPage.searchList(listName.toLowerCase());
+
+  await expect(contactListPage.listCard(listName)).toBeVisible();
+
+  await contactListPage.searchList(listName.toUpperCase());
+
+  await expect(contactListPage.listCard(listName)).toBeVisible();
+});
+
+test("Verify clicking list card opens correct list details page", async ({ page }) => {
+  const listName = `List-${Date.now()}`;
+
+  await contactListPage.openCreateContactListPanel();
+  await contactListPage.createContactList(listName);
+
+  await expect(contactListPage.listCard(listName)).toBeVisible();
+
+  await contactListPage.listCard(listName).click();
+
+  // Navigation happened
+  await expect(page).toHaveURL(/contact-lists\/.+/);
+
+  // Correct list opened
+  await expect(page.getByText(listName)).toBeVisible();
+
+  // List details page loaded (FIXED)
+  await expect(
+    page.getByRole("heading", { name: "Contacts", exact: true })
+  ).toBeVisible();
+});
+
+
+
 });

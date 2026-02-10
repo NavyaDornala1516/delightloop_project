@@ -72,6 +72,8 @@ export class ContactListPage {
   readonly noResultsText: Locator;
   readonly contactEmailCell: Locator;
   readonly addToListBtn: Locator;
+  readonly contactRows: Locator;
+  readonly listSearchInput: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -80,6 +82,8 @@ export class ContactListPage {
     this.createNewContactText = page.getByRole("heading", {
       name: "Create New Contact",
     });
+    this.allContactsTab = this.page.getByRole("tab", { name: /all contacts/i });
+    this.listsTab = this.page.getByRole("tab", { name: /lists/i });
     this.closeIcon = page.getByRole("button", { name: "Close" });
     this.firstName = page.getByPlaceholder("Enter first name");
     this.lastName = page.getByPlaceholder("Enter last name");
@@ -124,6 +128,7 @@ export class ContactListPage {
     this.firstNameError = page.getByText(
       /first name can only contain letters, spaces, hyphens, and apostrophes/i,
     );
+    this.listSearchInput = page.getByPlaceholder(/search lists/i);
 
     this.newContactListBtn = page.getByRole("button", {
       name: "New Contact List",
@@ -181,6 +186,10 @@ export class ContactListPage {
     this.createContactTitle = page.getByRole("heading", {
       name: "Create New Contact",
     });
+
+    this.contactRows = page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell") });
 
     this.invalidPhoneError = page.getByText(/valid phone number/i);
 
@@ -410,6 +419,10 @@ export class ContactListPage {
     }
   }
 
+  async switchToAllContactsTab() {
+    await this.allContactsTab.click();
+    await expect(this.contactRows.first()).toBeVisible({ timeout: 10000 });
+  }
   async verifyTrimmedValues(expected: {
     firstName: string;
     lastName: string;
@@ -538,17 +551,14 @@ export class ContactListPage {
     );
   }
 
-async searchContact(name: string) {
-  const searchInput = this.page.getByPlaceholder("Search contacts...");
+  async searchContact(name: string) {
+    const searchInput = this.page.getByPlaceholder("Search contacts...");
 
-  await expect(searchInput).toBeVisible({ timeout: 10000 });
-  await searchInput.fill(name);
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill(name);
 
-  await this.page.waitForTimeout(800); // debounce
-}
-
-
-
+    await this.page.waitForTimeout(800); // debounce
+  }
 
   async verifySearchResultVisible(searchValue: string) {
     const rows = this.page.getByRole("row", {
@@ -1123,11 +1133,6 @@ async searchContact(name: string) {
     return match ? Number(match[0]) : 0;
   }
 
-  // Contact row by name
-  contactRow(name: string): Locator {
-    return this.page.getByRole("row", { name: new RegExp(name, "i") });
-  }
-
   // Edit button inside a specific contact row
   editButtonForContact(name: string): Locator {
     return this.contactRow(name).getByRole("button", { name: "Edit" });
@@ -1195,5 +1200,12 @@ async searchContact(name: string) {
       names.push((await rows.nth(i).textContent()) || "");
     }
     return names;
+  }
+
+  async searchList(value: string) {
+    await expect(this.listSearchInput).toBeVisible({ timeout: 10000 });
+    await this.listSearchInput.fill(value);
+
+    await this.page.waitForTimeout(500);
   }
 }
