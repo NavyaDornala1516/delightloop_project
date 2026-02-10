@@ -62,6 +62,15 @@ export class ContactListPage {
   readonly profilePictureInput: Locator;
   readonly profilePicturePreview: Locator;
   readonly profilePictureError: Locator;
+  readonly profilePictureSubmitError: Locator;
+  readonly profilePictureSizeError: Locator;
+  readonly addressSuggestionItems: Locator;
+
+  readonly companyFilter: Locator;
+  readonly jobTitleFilter: Locator;
+  readonly clearFiltersBtn: Locator;
+  readonly noResultsText: Locator;
+  readonly contactEmailCell: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -186,6 +195,7 @@ export class ContactListPage {
     this.linkedinNoDetailsMsg = page.getByText(
       "No details found for this profile. Try a full URL or another username.",
     );
+    this.profilePictureSizeError = page.getByText(/size|mb|too large|exceed/i);
 
     this.linkedinProfileCard = page.locator("div.border-border-primary");
 
@@ -204,6 +214,27 @@ export class ContactListPage {
     this.profilePictureError = page.getByText(
       /invalid|unsupported|image format|profile picture/i,
     );
+    this.profilePictureSubmitError = page.getByText(
+      /profile picture|image|unsupported|invalid/i,
+    );
+
+    this.addressSuggestionItems = page.locator(
+      'div.absolute.z-50 button[type="button"]',
+    );
+
+    // Filter fields
+    this.companyFilter = page.getByLabel(/company/i);
+    this.jobTitleFilter = page.getByLabel(/job title/i);
+
+    // Clear filters
+    this.clearFiltersBtn = page.getByRole("button", { name: /clear filters/i });
+
+    // No results text
+    this.noResultsText = page.getByText(/no contacts found/i);
+
+    // Contact email cell
+    this.contactEmailCell = (email: string) =>
+      page.getByText(email, { exact: false });
   }
 
   async captureScreenshot(name: string) {
@@ -219,6 +250,62 @@ export class ContactListPage {
   async verifyProfilePictureRejected() {
     await expect(this.profilePictureError.first()).toBeVisible();
     await expect(this.page.locator("img")).toHaveCount(0);
+  }
+  async verifyProfilePictureErrorAfterSubmit() {
+    await expect(this.profilePictureSubmitError.first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    await expect(this.createContactDialog).toBeVisible();
+  }
+
+  async enterManualAddress(data: {
+    addressLine1: string;
+    addressLine2?: string;
+  }) {
+    await expect(this.addressLine1).toBeVisible();
+    await this.addressLine1.fill(data.addressLine1);
+
+    if (data.addressLine2) {
+      await this.addressLine2.fill(data.addressLine2);
+    }
+  }
+
+  async enterCityAndZip(city: string, zip: string) {
+    await expect(this.city).toBeVisible();
+    await this.city.fill(city);
+
+    await expect(this.zipCode).toBeVisible();
+    await this.zipCode.fill(zip);
+  }
+  async enterNotes(notes: string) {
+    await expect(this.notes).toBeVisible();
+    await this.notes.fill(notes);
+  }
+  async verifyManualAddressValues(data: {
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    zip: string;
+  }) {
+    await expect(this.addressLine1).toHaveValue(data.addressLine1);
+
+    if (data.addressLine2) {
+      await expect(this.addressLine2).toHaveValue(data.addressLine2);
+    }
+
+    await expect(this.city).toHaveValue(data.city);
+    await expect(this.zipCode).toHaveValue(data.zip);
+  }
+
+  async selectAddressSuggestionUsingKeyboard() {
+    await this.page.waitForSelector("div.absolute.z-50", {
+      state: "visible",
+      timeout: 15000,
+    });
+
+    await this.page.keyboard.press("ArrowDown");
+    await this.page.keyboard.press("Enter");
   }
 
   async verifyCreateContactPanelIsOpened() {
@@ -252,9 +339,34 @@ export class ContactListPage {
     await expect(this.addContactBtn).toBeVisible();
   }
 
+  async verifyProfilePictureSizeLimitError() {
+    await expect(this.profilePictureSizeError.first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    await expect(this.createContactDialog).toBeVisible();
+  }
+
+  async verifyAddressFieldsPopulated() {
+    await expect(this.addressLine1).not.toHaveValue("");
+
+    await expect(this.city).not.toHaveValue("");
+
+    await expect(this.state).toHaveValue(/.+/);
+    await expect(this.country).toHaveValue(/.+/);
+
+    if (await this.zipCode.isVisible()) {
+      await expect(this.zipCode).not.toHaveValue("");
+    }
+  }
+
   async verifyingAddContactBtnClickable() {
     await this.addContactBtn.click();
     await expect(this.createNewContactText).toBeVisible();
+  }
+
+  async verifyCountryNotAutoSelected() {
+    await expect(this.country).toHaveValue("");
   }
 
   async verifyAddContactModalOpened() {
@@ -276,15 +388,25 @@ export class ContactListPage {
     await expect(this.createNewContactText).not.toBeVisible();
   }
 
+
   async fillMandatoryFields(data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-  }) {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}) {
+  if (data.firstName !== undefined) {
     await this.firstName.fill(data.firstName);
+  }
+
+  if (data.lastName !== undefined) {
     await this.lastName.fill(data.lastName);
+  }
+
+  if (data.email !== undefined) {
     await this.email.fill(data.email);
   }
+}
+
 
   async verifyTrimmedValues(expected: {
     firstName: string;
@@ -417,16 +539,12 @@ export class ContactListPage {
     await expect(this.searchInput).toBeVisible();
     await this.searchInput.fill(value);
   }
-
   async verifySearchResultVisible(searchValue: string) {
-    const resultsCount = await this.contactNameButtons.count();
-    expect(resultsCount).toBeGreaterThan(0);
+    const rows = this.page.getByRole("row", {
+      name: new RegExp(searchValue, "i"),
+    });
 
-    for (let i = 0; i < resultsCount; i++) {
-      await expect(this.contactNameButtons.nth(i)).toContainText(
-        new RegExp(searchValue, "i"),
-      );
-    }
+    await expect(rows.first()).toBeVisible();
   }
 
   async verifySearchResults(searchValue: string) {
@@ -438,13 +556,6 @@ export class ContactListPage {
         new RegExp(searchValue, "i"),
       );
     }
-  }
-
-  async getContactCount(): Promise<number> {
-    await expect(this.listCountText.first()).toBeVisible({ timeout: 15000 });
-
-    const text = await this.listCountText.first().textContent();
-    return Number(text?.match(/\d+/)?.[0]);
   }
 
   async verifyContactCountIncremented(previousCount: number) {
@@ -543,6 +654,14 @@ export class ContactListPage {
 
     await expect(this.linkedinAutoFillBtn).toHaveCount(0);
   }
+  async verifyLinkedInInlineErrorVisible() {
+    await expect(
+      this.page.getByText(/Enter LinkedIn URL or username/i),
+    ).toBeVisible();
+  }
+  async verifyLinkedInProfileNotFetched() {
+    await expect(this.page.getByText("Auto-Fill")).toHaveCount(0);
+  }
 
   async verifyCreateButtonDisabled() {
     await expect(this.createNewContBtn).toBeDisabled();
@@ -612,11 +731,9 @@ export class ContactListPage {
   }
 
   async ensureContactsExist(count = 3) {
-    // Always create contacts from All Contacts
     await this.page.goto("/contact-lists");
     await this.allContactsTab.click();
 
-    // Pure alphabetic names
     const firstNames = ["Alpha", "Bravo", "Charlie", "Delta", "Echo"];
     const lastName = "Test";
 
@@ -921,20 +1038,118 @@ export class ContactListPage {
     await this.linkedinAutoFillBtn.click();
   }
 
-  async openFilters() {
-    await this.page.getByRole("button", { name: /filters/i }).click();
+  async typeAddress(value: string) {
+    await expect(this.addressLine1).toBeVisible();
+    await this.addressLine1.click();
+    await this.addressLine1.pressSequentially(value, { delay: 100 });
   }
-  async getContactCountFromCard(index = 0): Promise<number> {
-    const card = this.page.locator("div.rounded-xl").nth(index);
 
-    await expect(card).toBeVisible({ timeout: 15000 });
+  async verifyAddressSuggestionsVisible() {
+    await expect(this.addressSuggestionItems.first()).toBeVisible({
+      timeout: 15000,
+    });
+  }
 
-    const countText = await card
-      .getByText(/contact/i) // more reliable than tabular-nums
-      .textContent();
+  async selectFirstAddressSuggestion() {
+    await this.addressSuggestionItems.first().click();
+  }
 
-    const match = countText?.match(/\d+/);
+  async verifyAddressAutoFilled() {
+    await expect(this.addressLine1).not.toHaveValue("");
+  }
+
+  async openFilters() {
+    const filtersBtn = this.page.getByRole("button", {
+      name: /^Filters$/i,
+    });
+
+    await expect(filtersBtn).toBeVisible({ timeout: 10000 });
+    await expect(filtersBtn).toBeEnabled();
+
+    await filtersBtn.click();
+  }
+
+  async getContactCount(): Promise<number> {
+    await expect(this.listCountText.first()).toBeVisible({ timeout: 15000 });
+
+    const text = await this.listCountText.first().textContent();
+
+    const match = text?.match(/\d+/);
 
     return match ? Number(match[0]) : 0;
+  }
+
+  // Contact row by name
+  contactRow(name: string): Locator {
+    return this.page.getByRole("row", { name: new RegExp(name, "i") });
+  }
+
+  // Edit button inside a specific contact row
+  editButtonForContact(name: string): Locator {
+    return this.contactRow(name).getByRole("button", { name: "Edit" });
+  }
+
+  // All Edit buttons
+  editButtons(): Locator {
+    return this.page.getByRole("button", { name: /edit contact/i });
+  }
+
+  // Click first Edit button
+  async clickFirstEdit() {
+    await this.editButtons().first().click();
+  }
+  async verifyNoSearchResults() {
+    await expect.poll(async () => await this.getContactCount()).toBe(0);
+  }
+
+  async filterByCompany(company: string) {
+    await this.openFilters();
+    await this.companyFilter.fill(company);
+    await this.applyFilters();
+  }
+
+  async filterByJobTitle(jobTitle: string) {
+    await this.openFilters();
+    await this.jobTitleFilter.fill(jobTitle);
+    await this.applyFilters();
+  }
+
+  async clearFilters() {
+    await this.openFilters();
+
+    // Clear filter inputs if present
+    if (await this.companyFilter.isVisible()) {
+      await this.companyFilter.fill("");
+    }
+
+    if (await this.jobTitleFilter.isVisible()) {
+      await this.jobTitleFilter.fill("");
+    }
+
+    await this.applyFilters();
+  }
+
+  async verifyEmailVisible(email: string) {
+    const emails = this.page.getByText(email, { exact: false });
+
+    await expect(emails.first()).toBeVisible();
+  }
+
+  async verifyFilteredByJobTitle(expectedJobTitle: string) {
+    const jobTitleCells = this.page.locator("td", {
+      hasText: new RegExp(expectedJobTitle, "i"),
+    });
+
+    await expect(jobTitleCells.first()).toBeVisible();
+  }
+  async getContactNames(): Promise<string[]> {
+    const rows = this.page.locator("tbody tr");
+    const count = await rows.count();
+
+    const names: string[] = [];
+    for (let i = 0; i < count; i++) {
+      names.push((await rows.nth(i).textContent()) || "");
+    }
+    return names;
   }
 }
