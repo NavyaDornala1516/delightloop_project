@@ -136,33 +136,23 @@ async openAddContact(expectModal = true) {
 }
 
 
-
-async searchContact(name: string) {
-  // 1️⃣ Wait for panel to fully mount & settle
-  await this.page.waitForLoadState("networkidle");
-
-  // 2️⃣ Always locate JUST before interaction
+async searchContact(email: string) {
   const searchInput = this.page.getByPlaceholder(
-    /search contacts by name or email/i,
+    "Search contacts by name or email..."
   );
 
-  // 3️⃣ Ensure input is attached & ready
-  await expect(searchInput).toBeVisible({ timeout: 20000 });
-  await expect(searchInput).toBeEnabled();
+  // 1️⃣ Wait for panel input (real readiness)
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
 
-  // 4️⃣ Clear safely (important for re-renders)
-  // await searchInput.fill("");
+  // 2️⃣ Clear + type
+  await searchInput.fill("");
+  await searchInput.fill(email);
 
-  // 5️⃣ Type (NOT fill — safer for React inputs)
-  await searchInput.type(name, { delay: 50 });
-
-  // 6️⃣ Wait for results to appear
+  // 3️⃣ Wait for result containing the email
   await expect(
-    this.page.getByRole("row").first(),
-  ).toBeVisible({ timeout: 20000 });
+    this.page.getByText(email, { exact: false })
+  ).toBeVisible({ timeout: 15000 });
 }
-
-
 
 
 async selectFirstVisibleContact() {
@@ -331,4 +321,46 @@ async verifyDuplicateEmailErrorShown() {
   async verifyAddToListButtonIsNotVisible() {
     await expect(this.addToListBtn).toHaveCount(0);
   }
+  getContactRowByEmail(email: string) {
+  return this.page
+    .locator("div") // row container
+    .filter({
+      has: this.page.getByText(email, { exact: true }),
+    });
+}
+async openRenameList() {
+  const renameBtn = this.page.getByRole("button", { name: /rename/i });
+  await expect(renameBtn).toBeVisible();
+  await renameBtn.click();
+}
+
+async renameList(name: string) {
+  const input = this.page.getByPlaceholder(/list name/i);
+  await expect(input).toBeVisible();
+
+  await input.fill("");
+  await input.fill(name);
+
+  await this.page.getByRole("button", { name: /save/i }).click();
+}
+async selectAllContacts() {
+  const rows = this.page.locator("tbody tr");
+  const count = await rows.count();
+
+  for (let i = 0; i < count; i++) {
+    await rows.nth(i).click();
+  }
+}
+async getContactCount() {
+  return await this.page.locator("tbody tr").count();
+}
+async openDuplicateList() {
+  const duplicateBtn = this.page.getByRole("button", {
+    name: /duplicate/i,
+  });
+
+  await expect(duplicateBtn).toBeVisible();
+  await duplicateBtn.click();
+}
+
 }

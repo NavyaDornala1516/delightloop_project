@@ -105,10 +105,10 @@ test.describe("Contact List Tests", () => {
   test("Mandatory fields validation on Add Contact", async () => {
     await contactListPage.verifyingAddContactBtnClickable();
 
-    await contactListPage.fillMandatoryFields(
+    await contactListPage.fillMandatoryFields({
       "Navya",
       "ddd",
-      "navyadornala@test.com",
+      "navyadornala@test.com",}
     );
     await contactListPage.waitForContactCreation();
   });
@@ -694,22 +694,18 @@ test.describe("Contact List Tests", () => {
   test("Validate Create button disabled until mandatory fields filled", async ({
     page,
   }) => {
-
-
-    const email = `manual.address@test.com ${Date.now()}` 
+    const email = `manual.address@test.com ${Date.now()}`;
 
     await contactListPage.openCreateContactPanel();
 
     await contactListPage.submitForm();
     await expect(contactListPage.createContactDialog).toBeVisible();
-  
 
-     await contactListPage.fillMandatoryFields({
+    await contactListPage.fillMandatoryFields({
       firstName: "John",
       lastName: "Doe",
       email: email,
     });
-
 
     await contactListPage.verifyCreateButtonEnabled();
   });
@@ -1288,93 +1284,261 @@ test.describe("Contact List Tests", () => {
   //   await expect(contactListPage.listCard(listName)).toBeVisible();
   // });
 
+  test("Verify creating contact list with special characters", async ({
+    page,
+  }) => {
+    const invalidListName = `Test@#$% ${Date.now()}`;
 
+    await contactListPage.openCreateContactListPanel();
 
-test("Verify creating contact list with special characters", async ({ page }) => {
-  const invalidListName = `Test@#$% ${Date.now()}`;
+    await contactListPage.createContactList(invalidListName);
 
-  await contactListPage.openCreateContactListPanel();
+    await expect(
+      page.getByText(/list created successfully/i),
+    ).not.toBeVisible();
+  });
 
-  await contactListPage.createContactList(invalidListName);
+  test("Verify creating contact list with maximum allowed characters", async () => {
+    const timestamp = Date.now().toString();
+    const baseLength = 100 - timestamp.length - 1;
 
-  await expect(
-    page.getByText(/list created successfully/i),
-  ).not.toBeVisible();
+    const maxLengthName = `${"A".repeat(baseLength)}-${timestamp}`;
 
-});
+    expect(maxLengthName.length).toBe(100);
 
-test("Verify creating contact list with maximum allowed characters", async () => {
-  const timestamp = Date.now().toString();
-  const baseLength = 100 - timestamp.length - 1;
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(maxLengthName);
 
-  const maxLengthName = `${"A".repeat(baseLength)}-${timestamp}`;
+    await expect(contactListPage.listCard(maxLengthName)).toBeVisible();
+  });
 
-  expect(maxLengthName.length).toBe(100);
+  test("Verify list search returns correct results", async () => {
+    await contactListPage.switchToListsTab();
 
-  await contactListPage.openCreateContactListPanel();
-  await contactListPage.createContactList(maxLengthName);
+    const matchList = `Search-Match-${Date.now()}`;
+    const otherList = `Search-Other-${Date.now() + 1}`;
 
-  await expect(contactListPage.listCard(maxLengthName)).toBeVisible();
-});
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(matchList);
 
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(otherList);
 
-test("Verify list search returns correct results", async () => {
-  await contactListPage.switchToListsTab();
+    await contactListPage.searchList(matchList);
 
-  const matchList = `Search-Match-${Date.now()}`;
-  const otherList = `Search-Other-${Date.now() + 1}`;
+    await expect(contactListPage.listCard(matchList)).toBeVisible();
 
-  await contactListPage.openCreateContactListPanel();
-  await contactListPage.createContactList(matchList);
+    await expect(contactListPage.listCard(otherList)).toHaveCount(0);
+  });
 
-  await contactListPage.openCreateContactListPanel();
-  await contactListPage.createContactList(otherList);
+  test("Verify list search is case-insensitive", async () => {
+    await contactListPage.switchToListsTab();
 
-  await contactListPage.searchList(matchList);
+    const listName = `CaseTest-${Date.now()}`;
 
-  await expect(contactListPage.listCard(matchList)).toBeVisible();
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
 
-  await expect(contactListPage.listCard(otherList)).toHaveCount(0);
-});
+    await contactListPage.searchList(listName.toLowerCase());
 
-test("Verify list search is case-insensitive", async () => {
-  await contactListPage.switchToListsTab();
+    await expect(contactListPage.listCard(listName)).toBeVisible();
 
-  const listName = `CaseTest-${Date.now()}`;
+    await contactListPage.searchList(listName.toUpperCase());
 
-  await contactListPage.openCreateContactListPanel();
-  await contactListPage.createContactList(listName);
+    await expect(contactListPage.listCard(listName)).toBeVisible();
+  });
 
-  await contactListPage.searchList(listName.toLowerCase());
+  test("Verify clicking list card opens correct list details page", async ({
+    page,
+  }) => {
+    const listName = `List-${Date.now()}`;
 
-  await expect(contactListPage.listCard(listName)).toBeVisible();
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
 
-  await contactListPage.searchList(listName.toUpperCase());
+    await expect(contactListPage.listCard(listName)).toBeVisible();
 
-  await expect(contactListPage.listCard(listName)).toBeVisible();
-});
+    await contactListPage.listCard(listName).click();
 
-test("Verify clicking list card opens correct list details page", async ({ page }) => {
-  const listName = `List-${Date.now()}`;
+    // Navigation happened
+    await expect(page).toHaveURL(/contact-lists\/.+/);
 
-  await contactListPage.openCreateContactListPanel();
-  await contactListPage.createContactList(listName);
+    // Correct list opened
+    await expect(page.getByText(listName)).toBeVisible();
 
-  await expect(contactListPage.listCard(listName)).toBeVisible();
+    // List details page loaded (FIXED)
+    await expect(
+      page.getByRole("heading", { name: "Contacts", exact: true }),
+    ).toBeVisible();
+  });
 
-  await contactListPage.listCard(listName).click();
+  test("Verify list details page shows correct contact count", async ({
+    page,
+  }) => {
+    await contactListPage.ensureContactsExist(1);
 
-  // Navigation happened
-  await expect(page).toHaveURL(/contact-lists\/.+/);
+    const listName = `List-${Date.now()}`;
 
-  // Correct list opened
-  await expect(page.getByText(listName)).toBeVisible();
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
 
-  // List details page loaded (FIXED)
-  await expect(
-    page.getByRole("heading", { name: "Contacts", exact: true })
-  ).toBeVisible();
-});
+    await contactListPage.openList(listName);
+
+    await contactListDetailsPage.openAddContact();
+    await contactListDetailsPage.searchContact("Alpha");
+    await contactListDetailsPage.selectFirstVisibleContact();
+    await contactListDetailsPage.addToList();
+
+    await expect(page.getByText(/1\s+contact/i)).toBeVisible();
+  });
+
+  test("Verify handling of duplicate contacts during CSV import", async ({
+    page,
+  }) => {
+    const listName = `Duplicate-CSV-${Date.now()}`;
+
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    const countBefore = await contactListPage.getContactCount();
+
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadCsv("test-data/dublicateContacts.csv");
+    await contactListDetailsPage.completeCsvWizard();
+
+    const countAfter = await contactListPage.getContactCount();
+
+    expect(countAfter).toBe(countBefore);
+  });
+
+  test("Verify creating contact list with only spaces", async ({ page }) => {
+    await page.goto("/contact-lists", { waitUntil: "domcontentloaded" });
+    await contactListPage.switchToListsTab();
+
+    await contactListPage.openCreateContactListPanel();
+
+    await contactListPage.listNameInput.fill("     ");
+
+    await expect(page.getByText(/list name cannot be empty/i)).toBeVisible();
+  });
+
+  test("Verify rapid multiple clicks on Add Contact does not create duplicates", async () => {
+    await contactListPage.verifyingAddContactBtnClickable();
+
+    const countBefore = await contactListPage.getContactCount();
+
+    const email = `rapid.${Date.now()}@test.com`;
+
+    await contactListPage.fillMandatoryFields({
+      firstName: "Rapid",
+      lastName: "Click",
+      email: email,
+    });
+
+    await contactListPage.createNewContBtn.dblclick();
+
+    await expect(contactListPage.successText).toBeVisible({ timeout: 15000 });
+
+    await expect
+      .poll(async () => await contactListPage.getContactCount(), {
+        timeout: 15000,
+      })
+      .toBe(countBefore);
+  });
+
+  test("Verify refreshing page during contact import does not corrupt data", async ({
+    page,
+  }) => {
+    // 1️⃣ Open a list
+    const listName = `Import-Refresh-${Date.now()}`;
+
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
+    await contactListPage.openList(listName);
+
+    // 2️⃣ Capture count BEFORE import
+    const countBefore = await contactListPage.getContactCount();
+
+    // 3️⃣ Start CSV import
+    await contactListDetailsPage.openImportCsvModal();
+    await contactListDetailsPage.uploadCsv("test-data/contacts.csv");
+
+    // 4️⃣ Refresh DURING import (critical step)
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    // 5️⃣ App should recover safely
+    await expect(
+      page.getByRole("heading", { name: /contacts/i }),
+    ).toBeVisible();
+
+    // 6️⃣ Get count AFTER refresh
+    const countAfter = await contactListPage.getContactCount();
+
+    // 7️⃣ Validate data integrity
+    expect(countAfter === countBefore || countAfter > countBefore).toBeTruthy();
+  });
+
+  test("Verify accessing list details via direct URL works correctly", async ({
+    page,
+  }) => {
+    const listName = `DirectURL-${Date.now()}`;
+
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
+
+    await contactListPage.openList(listName);
+
+    const listUrl = page.url();
+
+    await page.goto(listUrl, { waitUntil: "domcontentloaded" });
+
+    await expect(
+      page.getByRole("heading", { name: "Contacts", exact: true }),
+    ).toBeVisible();
+
+    expect(page.url()).toContain("/contact-lists");
+
+    await expect(
+      page.getByText(/no contacts in this list/i).or(page.locator("table")),
+    ).toBeVisible();
+  });
+
+  test("Verify empty list displays proper empty state", async ({ page }) => {
+    const listName = `EmptyList-${Date.now()}`;
+
+    await contactListPage.openCreateContactListPanel();
+    await contactListPage.createContactList(listName);
+
+    await contactListPage.openList(listName);
+
+    await expect(
+      page
+        .getByRole("heading", {
+          name: "No contacts in this list",
+          exact: true,
+        })
+        .first(),
+    ).toBeVisible();
+
+    await expect(
+      page.getByRole("button", { name: "Add Contact" }).first(),
+    ).toBeVisible();
+
+    await expect(
+      page.getByRole("button", { name: "Import Contacts" }).first(),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByRole("heading", {
+          name: "No contacts in this list",
+          exact: true,
+        })
+        .first(),
+    ).toBeVisible();
+  });
+
 
 
 

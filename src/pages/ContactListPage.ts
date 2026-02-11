@@ -1208,4 +1208,16 @@ export class ContactListPage {
 
     await this.page.waitForTimeout(500);
   }
+
+
+
+listCardStartsWith(prefix: string) {
+  return this.page.locator("div.rounded-xl").filter({
+    has: this.page.getByRole("heading", {
+      name: new RegExp(`^${prefix}`, "i"),
+    }),
+  });
+}
+
+
 }
